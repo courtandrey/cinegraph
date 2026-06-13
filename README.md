@@ -23,7 +23,7 @@ read API.
                              └──────┬───────┘
                                     │ writes
                              ┌──────▼───────┐
-                             │ PostgreSQL 16 │  movie, credit, edge (10–40M rows)
+                             │ PostgreSQL 16 │  movie, credit, edge
                              └──────┬───────┘
                                     │ reads
 ┌────────────┐    REST       ┌──────▼───────┐
@@ -107,24 +107,18 @@ drives the "WHY SIMILAR" panel and edge tooltips in the UI.
 ### Run
 
 ```bash
-# 1. Start PostgreSQL
 docker-compose up -d
 
-# 2. Start the exporter (runs Flyway migrations on startup)
-export TMDB_ACCESS_TOKEN=eyJ...        # your v4 Bearer token
-export ADMIN_TOKEN=changeme            # optional; default is local-dev-token
+export TMDB_ACCESS_TOKEN=eyJ...
+export ADMIN_TOKEN=changeme
 mvn spring-boot:run -pl exporter
 
-# 3. Trigger ingest (smoke test: set ingest.limit-ids first — see Configuration)
 curl -X POST -H "X-Admin-Token: changeme" localhost:8081/admin/full-load
 
-# 4. Build edges once ingest completes
 curl -X POST -H "X-Admin-Token: changeme" localhost:8081/admin/edges/rebuild
 
-# 5. Start the read API
 mvn spring-boot:run -pl graph-api
 
-# 6. Start the frontend
 cd frontend && npm install && ng serve   # → http://localhost:4200
 ```
 
@@ -189,7 +183,7 @@ Key exporter settings (`application.yml`):
 ## Build & test
 
 ```bash
-mvn verify                          # both Spring modules (integration tests use Testcontainers)
+mvn verify
 mvn test -pl exporter -Dtest=FullLoadPipelineTest
 cd frontend && ng test && ng build
 ```
