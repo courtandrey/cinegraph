@@ -1,0 +1,13 @@
+package com.github.courtandrey.cinegraph.exporter;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@SpringBootApplication
+@EnableScheduling
+public class ExporterApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ExporterApplication.class, args);
+    }
+}

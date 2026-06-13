@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>dev.cinegraph</groupId>
+        <groupId>com.github.courtandrey.cinegraph</groupId>
         <artifactId>cinegraph</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
@@ -140,7 +140,7 @@
                             </forcedTypes>
                         </database>
                         <target>
-                            <packageName>dev.cinegraph.exporter.jooq</packageName>
+                            <packageName>com.github.courtandrey.cinegraph.exporter.jooq</packageName>
                             <directory>target/generated-sources/jooq</directory>
                         </target>
                     </generator>

@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>dev.cinegraph</groupId>
+    <groupId>com.github.courtandrey.cinegraph</groupId>
     <artifactId>cinegraph</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
