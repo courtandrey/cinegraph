@@ -148,7 +148,7 @@ public class EdgeBuildService {
 
             runRepo.finish(runId, RunStatus.COMPLETED, stats.toJson());
             if (incremental) {
-                ctx.deleteFrom(DIRTY_MOVIE).where(DIRTY_MOVIE.RUN_ID.eq(ingestRunId)).execute();
+                ctx.deleteFrom(DIRTY_MOVIE).where(DIRTY_MOVIE.RUN_ID.lt(ingestRunId)).execute();
             }
             log.info("[edge run {}] Edge build completed; {}", runId, stats.toJson());
         } catch (Exception e) {
