@@ -7,12 +7,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "graph")
 public class GraphScoringProperties {
 
-    private double minCrewScore     = 1.0;
     private double perPersonCap     = 20.0;
     private int    maxEdgeCandidates = 4000;
-
-    public double getMinCrewScore()         { return minCrewScore; }
-    public void setMinCrewScore(double v)         { this.minCrewScore = v; }
 
     public double getPerPersonCap()         { return perPersonCap; }
     public void setPerPersonCap(double v)         { this.perPersonCap = v; }

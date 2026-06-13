@@ -16,13 +16,12 @@ import java.util.Map;
  * Re-scores stored edges with custom weights, mirroring the exporter's model:
  * per shared person {@code sameRole ? w*1.5 : min(wA, wB)} capped per-person; the
  * genre/keyword/release correlations scale linearly from their stored score relative
- * to the default multiplier. An edge survives only while its crew contribution clears
- * the min-crew-score guard.
+ * to the default multiplier.
  */
 @Service
 public class GraphScoring {
 
-    public record Scored(float total, float crew, ArrayNode components, boolean survives) {}
+    public record Scored(float total, float crew, ArrayNode components) {}
 
     private final ObjectMapper mapper;
     private final TopReasonResolver topReason;
@@ -65,7 +64,7 @@ public class GraphScoring {
         }
 
         float total = (float) (crew + others);
-        return new Scored(total, (float) crew, out, crew >= props.getMinCrewScore());
+        return new Scored(total, (float) crew, out);
     }
 
     public String topReason(ArrayNode components) {

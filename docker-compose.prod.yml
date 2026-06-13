@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-cinegraph}
+      POSTGRES_USER: ${DB_USER:-cinegraph}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    command: >
+      postgres -c shared_buffers=1GB -c work_mem=64MB
+               -c maintenance_work_mem=512MB -c max_wal_size=4GB
+               -c checkpoint_timeout=15min -c synchronous_commit=off
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cinegraph} -d ${DB_NAME:-cinegraph}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [cinegraph]
+
+  exporter:
+    image: registry.gitlab.com/courtandrey/cinegraph/exporter:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-cinegraph}
+      DB_USER: ${DB_USER:-cinegraph}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN:?TMDB_ACCESS_TOKEN is required}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is required}
+      JAVA_OPTS: ${EXPORTER_JAVA_OPTS:-}
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks: [cinegraph]
+
+  graph-api:
+    image: registry.gitlab.com/courtandrey/cinegraph/graph-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-cinegraph}
+      DB_USER: ${DB_USER:-cinegraph}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      JAVA_OPTS: ${GRAPH_API_JAVA_OPTS:-}
+    expose:
+      - "8080"
+    networks: [cinegraph]
+
+  frontend:
+    image: registry.gitlab.com/courtandrey/cinegraph/frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - graph-api
+    ports:
+      - "80:80"
+    networks: [cinegraph]
+
+networks:
+  cinegraph:
+    driver: bridge
+
+volumes:
+  pgdata:

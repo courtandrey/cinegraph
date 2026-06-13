@@ -1,12 +1,14 @@
 spring:
   application:
     name: cinegraph-graph-api
+  profiles:
+    default: local
   datasource:
-    url: jdbc:postgresql://localhost:5432/cinegraph
-    username: cinegraph
-    password: cinegraph
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/cinegraph}
+    username: ${DB_USER:cinegraph}
+    password: ${DB_PASSWORD:cinegraph}
     hikari:
-      maximum-pool-size: 8
+      maximum-pool-size: ${DB_POOL_SIZE:8}
   flyway:
     enabled: false
   threads:
@@ -20,6 +22,8 @@ graph:
   min-crew-score: 1.0
   per-person-cap: 20.0
   max-edge-candidates: 4000
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
 management:
   endpoints:

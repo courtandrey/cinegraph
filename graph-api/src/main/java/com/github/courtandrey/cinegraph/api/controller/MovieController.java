@@ -114,7 +114,6 @@ public class MovieController {
         List<GraphEdge> edges = new ArrayList<>(centerEdges);
         edgeRepo.findInterNeighborEdges(neighborIds, 0f).stream()
                 .map(e -> reweightEdge(e, weights))
-                .filter(java.util.Objects::nonNull)
                 .forEach(edges::add);
 
         return ResponseEntity.ok(new GraphPayload(center.get(), nodes, edges));
@@ -123,7 +122,6 @@ public class MovieController {
     private GraphEdge reweightEdge(NeighborEdge e, Map<String, Double> weights) {
         JsonNode components = parseComponents(e.componentsJson());
         GraphScoring.Scored scored = graphScoring.rescore(components, weights);
-        if (!scored.survives()) return null;
         return new GraphEdge(e.movieA(), e.movieB(), scored.total(),
                 graphScoring.topReason(scored.components()), scored.components());
     }

@@ -1,12 +1,14 @@
 spring:
   application:
     name: cinegraph-exporter
+  profiles:
+    default: local
   datasource:
-    url: jdbc:postgresql://localhost:5432/cinegraph
-    username: cinegraph
-    password: cinegraph
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/cinegraph}
+    username: ${DB_USER:cinegraph}
+    password: ${DB_PASSWORD:cinegraph}
     hikari:
-      maximum-pool-size: 16
+      maximum-pool-size: ${DB_POOL_SIZE:16}
   flyway:
     locations: classpath:db/migrations
   threads:

@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cinegraph
+    username: cinegraph
+    password: cinegraph
+
+graph:
+  cors:
+    allowed-origins: http://localhost:4200

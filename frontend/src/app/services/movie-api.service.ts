@@ -1,11 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { MovieSummary, MovieDetail, GraphPayload, EdgeBreakdown, RoleWeight } from '../models/movie.model';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class MovieApiService {
   private http = inject(HttpClient);
-  private readonly base = 'http://localhost:8080/api';
+  private readonly base = environment.apiBase;
 
   search(q: string, limit = 10) {
     return this.http.get<MovieSummary[]>(`${this.base}/movies/search`, {
