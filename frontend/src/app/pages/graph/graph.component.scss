@@ -1,0 +1,169 @@
+@use '../../../styles/tokens' as *;
+
+.graph-page {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.canvas-area {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 14px;
+  background: $panel;
+  border-bottom: 1px solid $border;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  min-height: 40px;
+}
+
+.back-btn {
+  background: transparent;
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $text;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover {
+    background: $panel-2;
+    color: $text-bright;
+  }
+}
+
+.breadcrumbs {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.breadcrumb-chip {
+  background: $panel-2;
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $text;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &:hover {
+    background: $border;
+    color: $text-bright;
+  }
+
+  .bc-year {
+    opacity: 0.6;
+    margin-left: 3px;
+  }
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
+.control-label {
+  font-size: 11px;
+  color: $text;
+  letter-spacing: 0.075em;
+  white-space: nowrap;
+}
+
+.control-value {
+  font-size: 11px;
+  color: $text-bright;
+  min-width: 22px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.slider {
+  width: 90px;
+  accent-color: $accent-green;
+  cursor: pointer;
+}
+
+.select {
+  background: $panel-2;
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $text-bright;
+  font-size: 12px;
+  padding: 3px 6px;
+  font-family: inherit;
+  cursor: pointer;
+
+  option { background: $panel; }
+}
+
+.loading-bar {
+  height: 2px;
+  background: $panel-2;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  .loading-inner {
+    height: 100%;
+    width: 35%;
+    background: $accent-green;
+    animation: slide 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes slide {
+  0%   { margin-left: -35%; }
+  100% { margin-left: 100%; }
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text;
+  font-size: 15px;
+}
+
+.side-panel {
+  width: 360px;
+  background: $panel;
+  border-left: 1px solid $border;
+  overflow-y: auto;
+  flex-shrink: 0;
+}

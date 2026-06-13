@@ -1,0 +1,56 @@
+roles:
+  - code: DIRECTOR
+    baseWeight: 10.0
+    departments:
+      Directing:
+        jobs: ["Director"]
+  - code: WRITER
+    baseWeight: 8.0
+    departments:
+      Writing:
+        jobs: ["Screenplay", "Writer", "Story", "Novel", "Adaptation", "Original Story",
+               "Scenario", "Dialogue", "Teleplay", "Book", "Comic Book", "Story By",
+               "Written By", "Screen Story"]
+  - code: DOP
+    baseWeight: 6.0
+    departments:
+      Camera:
+        jobs: ["Director of Photography"]
+  - code: EDITOR
+    baseWeight: 6.0
+    departments:
+      Editing:
+        jobs: ["Editor"]
+  - code: COMPOSER
+    baseWeight: 6.0
+    departments:
+      Sound:
+        jobs: ["Original Music Composer"]
+  - code: PRODUCER
+    baseWeight: 4.0
+    departments:
+      Production:
+        jobs: ["Producer"]
+  - code: PRODUCTION_DESIGNER
+    baseWeight: 4.0
+    departments:
+      Art:
+        jobs: ["Production Designer"]
+  - code: COSTUME_DESIGNER
+    baseWeight: 3.0
+    departments:
+      "Costume & Make-Up":
+        jobs: ["Costume Designer"]
+  - code: EXEC_PRODUCER
+    baseWeight: 1.5
+    departments:
+      Production:
+        jobs: ["Executive Producer"]
+  - code: CAST_LEAD
+    baseWeight: 5.0
+  - code: CAST_SUPPORT
+    baseWeight: 2.0
+  - code: CAST_MINOR
+    baseWeight: 0.75
+  - code: CREW_OTHER
+    baseWeight: 0.5

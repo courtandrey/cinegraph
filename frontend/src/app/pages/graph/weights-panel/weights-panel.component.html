@@ -1,0 +1,56 @@
+<div class="weights-panel">
+  <div class="panel-header">
+    <span class="panel-title">GRAPH WEIGHTS</span>
+    <button class="close-btn" (click)="closed.emit()" aria-label="Close">✕</button>
+  </div>
+
+  <p class="panel-hint">
+    Adjust weights and apply to re-score the visible graph. Edges falling below
+    the threshold disappear; rings re-arrange by the new scores.
+  </p>
+
+  <div class="slider-list">
+    @if (componentRows().length > 0) {
+      <div class="group-header">CORRELATIONS</div>
+      @for (role of componentRows(); track role.code) {
+        <ng-container *ngTemplateOutlet="sliderRow; context: { role }" />
+      }
+    }
+    @if (roleRows().length > 0) {
+      <div class="group-header">ROLES</div>
+      @for (role of roleRows(); track role.code) {
+        <ng-container *ngTemplateOutlet="sliderRow; context: { role }" />
+      }
+    }
+  </div>
+
+  <ng-template #sliderRow let-role="role">
+    <div class="slider-row">
+      <div class="slider-meta">
+        <span class="role-label">{{ label(role.code) }}</span>
+        <span class="role-count">×{{ role.count }}</span>
+        <span class="role-value" [class.modified]="draftValue(role) !== role.defaultWeight">
+          {{ draftValue(role) }}
+        </span>
+      </div>
+      <input
+        type="range"
+        class="slider"
+        min="0"
+        [max]="maxWeight"
+        step="0.5"
+        [value]="draftValue(role)"
+        (input)="onSlide(role.code, $any($event.target).value)"
+      />
+    </div>
+  </ng-template>
+
+  <div class="panel-footer">
+    <button class="apply-btn" [disabled]="!dirty()" (click)="onApply()">
+      APPLY WEIGHTS
+    </button>
+    <button class="reset-btn" [disabled]="!active && !dirty()" (click)="onReset()">
+      RESET TO DEFAULTS
+    </button>
+  </div>
+</div>

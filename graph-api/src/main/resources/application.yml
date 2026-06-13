@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: cinegraph-graph-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cinegraph
+    username: cinegraph
+    password: cinegraph
+    hikari:
+      maximum-pool-size: 8
+  flyway:
+    enabled: false
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+
+graph:
+  min-crew-score: 1.0
+  per-person-cap: 20.0
+  max-edge-candidates: 4000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: cinegraph
+      POSTGRES_USER: cinegraph
+      POSTGRES_PASSWORD: cinegraph
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    command: >
+      postgres -c shared_buffers=1GB -c work_mem=64MB
+               -c maintenance_work_mem=512MB -c max_wal_size=4GB
+               -c checkpoint_timeout=15min -c synchronous_commit=off
+volumes:
+  pgdata:

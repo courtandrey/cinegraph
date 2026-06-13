@@ -1,0 +1,7 @@
+<div #container class="cy-container"></div>
+
+@if (tooltipVisible()) {
+  <div class="edge-tooltip" [style.left.px]="tooltipX()" [style.top.px]="tooltipY()">
+    {{ tooltipText() }}
+  </div>
+}

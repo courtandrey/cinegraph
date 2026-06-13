@@ -1,0 +1,107 @@
+<div class="panel">
+
+  @if (breakdown && selectedMovie && center) {
+
+    <div class="selected-header">
+      @if (posterW92(selectedMovie.posterPath); as src) {
+        <img class="selected-poster" [src]="src" [alt]="selectedMovie.title"
+             (error)="imgEl.hidden = true; fbEl.hidden = false" #imgEl />
+        <div class="selected-poster poster-placeholder" hidden #fbEl></div>
+      } @else {
+        <div class="selected-poster poster-placeholder"></div>
+      }
+      <div class="selected-meta">
+        <div class="selected-title">{{ selectedMovie.title }}</div>
+        @if (selectedMovie.year) {
+          <div class="selected-year">{{ selectedMovie.year }}</div>
+        }
+      </div>
+    </div>
+
+    <div class="section-header">WHY SIMILAR</div>
+
+    <div class="total-row">
+      <span class="total-label">Total score</span>
+      <span class="total-score">{{ breakdown.totalScore.toFixed(1) }}</span>
+    </div>
+
+    <ul class="breakdown-list">
+      @for (comp of breakdown.components; track $index) {
+        <li class="breakdown-item">
+          <span class="comp-label">{{ componentLabel(comp) }}</span>
+          <span class="comp-score">+{{ comp.score.toFixed(1) }}</span>
+        </li>
+      }
+    </ul>
+
+    <div class="panel-footer">
+      <button class="back-center-btn" (click)="backToCenter.emit()">← Back to center</button>
+      <button class="re-center-btn" (click)="reCenter.emit(selectedMovie.id)">
+        RE-CENTER GRAPH ON THIS FILM
+      </button>
+    </div>
+
+  } @else if (center) {
+
+    <div class="center-film">
+      @if (posterW342(center.posterPath); as src) {
+        <img class="center-poster" [src]="src" [alt]="center.title"
+             (error)="cImgEl.hidden = true; cFbEl.hidden = false" #cImgEl />
+        <div class="center-poster poster-placeholder" hidden #cFbEl></div>
+      } @else {
+        <div class="center-poster poster-placeholder"></div>
+      }
+      <div class="center-info">
+        <h2 class="center-title">{{ center.title }}</h2>
+        @if (center.year) {
+          <div class="center-year">{{ center.year }}</div>
+        }
+
+        @if (center.genres.length > 0) {
+          <div class="section-header">GENRES</div>
+          <div class="chip-row">
+            @for (g of center.genres; track g.id) {
+              <span class="chip">{{ g.name }}</span>
+            }
+          </div>
+        }
+
+        @if (center.countries.length > 0) {
+          <div class="section-header">COUNTRIES</div>
+          <div class="chip-row">
+            @for (c of center.countries; track c) {
+              <span class="chip">{{ c }}</span>
+            }
+          </div>
+        }
+
+        @if (center.runtime) {
+          <div class="section-header">RUNTIME</div>
+          <div class="meta-value">{{ center.runtime }} min</div>
+        }
+
+        @if (center.voteAverage) {
+          <div class="meta-value rating">★ {{ center.voteAverage.toFixed(1) }}</div>
+        }
+
+        @if (center.overview) {
+          <div class="section-header">OVERVIEW</div>
+          <p class="overview">{{ center.overview }}</p>
+        }
+      </div>
+
+      <div class="panel-footer">
+        <button class="weights-btn" [class.active]="weightsActive" (click)="adjustWeights.emit()">
+          ⚖ ADJUST GRAPH WEIGHTS
+          @if (weightsActive) {
+            <span class="weights-flag">CUSTOM</span>
+          }
+        </button>
+      </div>
+    </div>
+
+  } @else {
+    <div class="panel-empty">Search for a film to explore its graph.</div>
+  }
+
+</div>

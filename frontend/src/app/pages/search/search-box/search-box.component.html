@@ -1,0 +1,43 @@
+<div class="search-box">
+  <div class="input-wrapper">
+    <input
+      [formControl]="searchControl"
+      placeholder="e.g. Inception, The Godfather…"
+      autocomplete="off"
+      spellcheck="false"
+      class="search-input"
+      (keydown)="onKeydown($event)"
+      (blur)="close()"
+      (focus)="open.set(results().length > 0)"
+    />
+    @if (loading()) {
+      <span class="spinner"></span>
+    }
+  </div>
+
+  @if (open() && results().length > 0) {
+    <ul class="dropdown" role="listbox">
+      @for (movie of results(); track movie.id; let i = $index) {
+        @let hl = highlight(movie.title, searchControl.value ?? '');
+        <li
+          class="dropdown-item"
+          [class.active]="activeIndex() === i"
+          role="option"
+          (mousedown)="select(movie)"
+        >
+          @if (posterUrl(movie.posterPath); as src) {
+            <img class="thumb" [src]="src" [alt]="movie.title" />
+          } @else {
+            <div class="thumb thumb--empty"></div>
+          }
+          <span class="title">
+            <span>{{ hl.pre }}</span><span class="match">{{ hl.match }}</span><span>{{ hl.post }}</span>
+          </span>
+          @if (movie.year) {
+            <span class="year">{{ movie.year }}</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>

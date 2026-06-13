@@ -1,0 +1,87 @@
+<div class="graph-page">
+  <div class="canvas-area">
+
+    <div class="toolbar">
+      <button class="back-btn" (click)="router.navigate(['/'])">← Search</button>
+      <div class="breadcrumbs">
+        @for (movie of store.visitedCenters(); track movie.id) {
+          <button class="breadcrumb-chip" (click)="onReCenter(movie.id)">
+            {{ movie.title }}@if (movie.year) { <span class="bc-year">{{ movie.year }}</span>}
+          </button>
+        }
+      </div>
+      <div class="controls">
+        <span class="control-group" [class.disabled]="weightsActive()">
+          <span class="control-label">MIN SCORE</span>
+          <input
+            type="range" min="12" max="60" step="1"
+            [value]="store.minScore()"
+            [disabled]="weightsActive()"
+            (change)="onMinScoreChange(+$any($event.target).value)"
+            class="slider"
+            [title]="weightsActive() ? 'Disabled while custom weights are applied' : ''"
+          />
+          <span class="control-value">{{ store.minScore() }}</span>
+        </span>
+        <span class="control-group">
+          <span class="control-label">LIMIT</span>
+          <select
+            [value]="store.limit()"
+            (change)="onLimitChange(+$any($event.target).value)"
+            class="select"
+          >
+            @for (opt of limitOptions; track opt) {
+              <option [value]="opt">{{ opt }}</option>
+            }
+          </select>
+        </span>
+      </div>
+    </div>
+
+    @if (loading()) {
+      <div class="loading-bar"><div class="loading-inner"></div></div>
+    }
+
+    @if (weightsOpen()) {
+      <app-weights-panel
+        [roles]="roleSliders()"
+        [active]="weightsActive()"
+        (apply)="onWeightsApply($event)"
+        (reset)="onWeightsReset()"
+        (closed)="weightsOpen.set(false)"
+      />
+    }
+
+    @if (graph(); as g) {
+      @if (g.nodes.length === 0) {
+        <div class="empty-state">
+          No sufficiently similar films found — lower the threshold.
+        </div>
+      } @else {
+        <app-graph-canvas
+          [graph]="g"
+          [centerId]="centerId()"
+          [minScore]="store.minScore()"
+          [selectedNodeId]="selectedNodeId()"
+          (nodeTap)="onNodeTap($event)"
+          (clearSelection)="onClearSelection()"
+        />
+      }
+    } @else if (!loading()) {
+      <div class="empty-state">Loading graph…</div>
+    }
+
+  </div>
+
+  <aside class="side-panel">
+    <app-film-panel
+      [graph]="graph()"
+      [breakdown]="selectedBreakdown()"
+      [selectedNodeId]="selectedNodeId()"
+      [weightsActive]="weightsActive()"
+      (reCenter)="onReCenter($event)"
+      (backToCenter)="onClearSelection()"
+      (adjustWeights)="onAdjustWeights()"
+    />
+  </aside>
+</div>

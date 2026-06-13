@@ -1,0 +1,110 @@
+@use '../../../../styles/tokens' as *;
+
+.search-box {
+  position: relative;
+  width: 100%;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 40px 12px 16px;
+  background: $panel-2;
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $text-bright;
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &::placeholder {
+    color: $text;
+    opacity: 0.6;
+  }
+
+  &:focus {
+    border-color: $accent-green;
+  }
+}
+
+.spinner {
+  position: absolute;
+  right: 14px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid $border;
+  border-top-color: $accent-green;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: $panel;
+  border: 1px solid $border;
+  border-radius: 3px;
+  list-style: none;
+  z-index: 200;
+  max-height: 420px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+
+  &:hover,
+  &.active {
+    background: $panel-2;
+  }
+}
+
+.thumb {
+  width: 32px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+
+  &--empty {
+    background: $panel-2;
+  }
+}
+
+.title {
+  flex: 1;
+  color: $text-bright;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  .match {
+    color: $accent-green;
+  }
+}
+
+.year {
+  color: $text;
+  font-size: 12px;
+  flex-shrink: 0;
+}

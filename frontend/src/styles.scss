@@ -1,0 +1,24 @@
+@use 'styles/tokens' as *;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: $bg;
+  color: $text;
+  font-family: "Graphik", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+}
+
+a {
+  color: $accent-blue;
+  text-decoration: none;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: $panel; }
+::-webkit-scrollbar-thumb { background: $border; border-radius: 3px; }

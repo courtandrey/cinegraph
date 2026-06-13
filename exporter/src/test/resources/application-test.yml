@@ -1,0 +1,14 @@
+ingest:
+  skip-adult: true
+  skip-video: true
+
+admin:
+  token: test-admin-token
+
+resilience4j:
+  ratelimiter:
+    instances:
+      tmdb:
+        limit-for-period: 500
+        limit-refresh-period: 1s
+        timeout-duration: 10s

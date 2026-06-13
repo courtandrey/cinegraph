@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: cinegraph-exporter
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cinegraph
+    username: cinegraph
+    password: cinegraph
+    hikari:
+      maximum-pool-size: 16
+  flyway:
+    locations: classpath:db/migrations
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+tmdb:
+  base-url: https://api.themoviedb.org
+  export-base-url: https://files.tmdb.org
+  access-token: ${TMDB_ACCESS_TOKEN:}
+  rate-limit:
+    permits-per-second: 30
+  max-concurrency: 64
+
+ingest:
+  skip-adult: true
+  skip-video: true
+  max-catchup-days: 90
+  # limit-ids: 1000
+
+admin:
+  token: ${ADMIN_TOKEN:local-dev-token}
+
+resilience4j:
+  ratelimiter:
+    instances:
+      tmdb:
+        limit-for-period: 30
+        limit-refresh-period: 1s
+        timeout-duration: 10s
