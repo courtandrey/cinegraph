@@ -188,15 +188,6 @@ mvn test -pl exporter -Dtest=FullLoadPipelineTest
 cd frontend && ng test && ng build
 ```
 
-## Deployment
-
-Production runs as a Docker Compose stack (Postgres + exporter + graph-api +
-nginx frontend), built and pushed to the GitLab Container Registry by
-`.gitlab-ci.yml`. Only the frontend is web-facing; it proxies `/api` to
-graph-api, while exporter and Postgres are bound to loopback. Server sizing,
-cost comparison, and the full setup walkthrough are in
-[DEPLOYMENT.md](DEPLOYMENT.md).
-
 ## Project layout
 
 ```

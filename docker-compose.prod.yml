@@ -61,8 +61,24 @@ services:
     restart: unless-stopped
     depends_on:
       - graph-api
+    expose:
+      - "80"
+    networks: [cinegraph]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS is required, e.g. example.com or "example.com, www.example.com"}
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks: [cinegraph]
 
 networks:
@@ -71,3 +87,5 @@ networks:
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:
