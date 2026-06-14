@@ -43,11 +43,16 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
   private cy: Core | null = null;
   private lastLayoutCenter: number | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private resizeRaf = 0;
+  private lastW = 0;
+  private lastH = 0;
 
   constructor(private ngZone: NgZone) {}
 
   ngAfterViewInit(): void {
     this.initCytoscape();
+    this.observeResize();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -60,8 +65,36 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
   }
 
   ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
+    if (this.resizeRaf) cancelAnimationFrame(this.resizeRaf);
     this.cy?.destroy();
     this.cy = null;
+  }
+
+  private observeResize(): void {
+    const el = this.containerRef.nativeElement;
+    this.lastW = el.clientWidth;
+    this.lastH = el.clientHeight;
+    this.ngZone.runOutsideAngular(() => {
+      this.resizeObserver = new ResizeObserver(entries => {
+        const { width, height } = entries[0].contentRect;
+        if (Math.abs(width - this.lastW) < 2 && Math.abs(height - this.lastH) < 2) return;
+        this.lastW = width;
+        this.lastH = height;
+        if (this.resizeRaf) cancelAnimationFrame(this.resizeRaf);
+        this.resizeRaf = requestAnimationFrame(() => {
+          const cy = this.cy;
+          if (!cy) return;
+          cy.resize();
+          cy.fit(undefined, this.fitPadding());
+        });
+      });
+      this.resizeObserver.observe(el);
+    });
+  }
+
+  private fitPadding(): number {
+    return this.containerRef.nativeElement.clientWidth < 640 ? 24 : 60;
   }
 
   private initCytoscape(): void {
@@ -418,7 +451,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
       animate: true,
       animationDuration: 600,
       fit,
-      padding: 60
+      padding: this.fitPadding()
     };
   }
 }

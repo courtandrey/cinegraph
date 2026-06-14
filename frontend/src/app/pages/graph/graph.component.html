@@ -73,7 +73,16 @@
 
   </div>
 
-  <aside class="side-panel">
+  <button
+    class="info-fab"
+    [class.hidden]="infoOpen()"
+    (click)="infoOpen.set(true)"
+  >
+    @if (selectedNodeId() !== null) { Why similar } @else { Film details }
+  </button>
+
+  <aside class="side-panel" [class.open]="infoOpen()">
+    <button class="panel-collapse" (click)="infoOpen.set(false)">▾ Collapse</button>
     <app-film-panel
       [graph]="graph()"
       [breakdown]="selectedBreakdown()"

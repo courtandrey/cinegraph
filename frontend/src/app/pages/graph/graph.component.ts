@@ -27,6 +27,7 @@ export class GraphComponent implements OnInit {
   readonly selectedNodeId = signal<number | null>(null);
   readonly selectedBreakdown = signal<EdgeBreakdown | null>(null);
   readonly weightsOpen = signal(false);
+  readonly infoOpen = signal(false);
   readonly defaultWeights = signal<ReadonlyMap<string, number>>(new Map());
 
   readonly limitOptions = [25, 40, 75, 100];
@@ -103,6 +104,7 @@ export class GraphComponent implements OnInit {
       return;
     }
     this.selectedNodeId.set(nodeId);
+    this.infoOpen.set(true);
 
     if (this.weightsActive()) {
       this.selectedBreakdown.set(this.localBreakdown(nodeId));
@@ -126,6 +128,7 @@ export class GraphComponent implements OnInit {
   }
 
   onReCenter(id: number): void {
+    this.infoOpen.set(false);
     this.router.navigate(['/film', id]);
   }
 
@@ -140,6 +143,7 @@ export class GraphComponent implements OnInit {
   }
 
   onAdjustWeights(): void {
+    this.infoOpen.set(false);
     this.weightsOpen.update(open => !open);
   }
 
