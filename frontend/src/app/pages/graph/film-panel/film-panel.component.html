@@ -48,6 +48,7 @@
   } @else if (center) {
 
     <div class="center-film">
+      <div class="center-scroll">
       @if (posterW342(center.posterPath); as src) {
         <img class="center-poster" [src]="src" [alt]="center.title"
              (error)="cImgEl.hidden = true; cFbEl.hidden = false" #cImgEl />
@@ -92,6 +93,7 @@
           <div class="section-header">OVERVIEW</div>
           <p class="overview">{{ center.overview }}</p>
         }
+      </div>
       </div>
 
       <div class="panel-footer">
