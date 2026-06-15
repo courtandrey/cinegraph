@@ -23,7 +23,7 @@
   background: $panel;
   border-bottom: 1px solid $border;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   min-height: 40px;
 }
 
@@ -53,16 +53,12 @@
   flex-shrink: 0;
 }
 
-.toolbar-spacer {
-  flex: 1;
-  min-width: 0;
-}
-
 .controls {
   display: flex;
   align-items: center;
   gap: 14px;
-  flex-shrink: 0;
+  margin-left: auto;
+  min-width: 0;
 }
 
 .control-group {
@@ -213,21 +209,47 @@
     }
   }
 
-  /* Compact toolbar; controls wrap to a second row instead of clipping. */
+  /* Single compact row: nav left, controls right; the slider shrinks to fit. */
   .toolbar {
     gap: 8px;
     padding: 6px 10px;
   }
 
-  .toolbar-spacer {
-    display: none;
+  .back-btn {
+    padding: 3px 8px;
+    letter-spacing: 0.03em;
   }
 
   .controls {
-    gap: 10px;
+    gap: 9px;
+  }
+
+  .control-group {
+    gap: 5px;
+    min-width: 0;
+
+    &:first-child {
+      flex: 1 1 auto;
+    }
+  }
+
+  .control-label {
+    font-size: 9.5px;
+    letter-spacing: 0.03em;
   }
 
   .slider {
-    width: 68px;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 24px;
+    max-width: 90px;
+  }
+
+  .control-value {
+    min-width: 16px;
+  }
+
+  .select {
+    padding: 3px 4px;
   }
 }
