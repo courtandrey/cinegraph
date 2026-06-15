@@ -178,14 +178,12 @@
   }
 }
 
-/* Center film view */
 .center-film {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-/* Poster + info scroll together; only the footer stays pinned. */
 .center-scroll {
   flex: 1;
   min-height: 0;

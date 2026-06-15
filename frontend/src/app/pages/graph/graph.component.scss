@@ -142,16 +142,12 @@
   flex-shrink: 0;
 }
 
-/* Collapse bar + open button are mobile-only; hidden on desktop. */
 .panel-collapse,
 .info-fab {
   display: none;
 }
 
 @media (max-width: 820px) {
-  /* Graph owns the whole screen; the panel becomes a collapsible bottom sheet.
-     Fixed-height flex column so only the breakdown list scrolls — the collapse
-     bar and the re-center footer stay on screen. */
   .side-panel {
     position: fixed;
     inset: 0;
@@ -212,7 +208,6 @@
     }
   }
 
-  /* Single compact row: nav left, controls right; the slider shrinks to fit. */
   .toolbar {
     gap: 8px;
     padding: 6px 10px;
