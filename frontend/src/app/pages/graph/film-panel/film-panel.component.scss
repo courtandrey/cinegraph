@@ -114,6 +114,16 @@
   padding-top: 1px;
 }
 
+.breakdown-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
 .panel-footer {
   padding-top: 14px;
   margin-top: auto;

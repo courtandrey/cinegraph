@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GraphCanvasComponent } from './graph-canvas/graph-canvas.component';
 import { FilmPanelComponent } from './film-panel/film-panel.component';
@@ -18,6 +19,7 @@ import { GraphPayload, GraphNode, MovieDetail, EdgeBreakdown, RoleWeight } from 
 export class GraphComponent implements OnInit {
   private route = inject(ActivatedRoute);
   readonly router = inject(Router);
+  private location = inject(Location);
   private api = inject(MovieApiService);
   readonly store = inject(GraphStore);
 
@@ -33,6 +35,13 @@ export class GraphComponent implements OnInit {
   readonly limitOptions = [25, 40, 75, 100];
 
   readonly weightsActive = computed(() => this.store.customWeights() !== null);
+
+  readonly canGoBack = computed(() => this.store.visitedCenters().length > 1);
+
+  goBack(): void {
+    this.infoOpen.set(false);
+    this.location.back();
+  }
 
   readonly roleSliders = computed<RoleSlider[]>(() => {
     const g = this.graph();
@@ -104,6 +113,7 @@ export class GraphComponent implements OnInit {
       return;
     }
     this.selectedNodeId.set(nodeId);
+    this.selectedBreakdown.set(null);
     this.infoOpen.set(true);
 
     if (this.weightsActive()) {

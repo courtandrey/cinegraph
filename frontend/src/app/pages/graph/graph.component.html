@@ -2,14 +2,13 @@
   <div class="canvas-area">
 
     <div class="toolbar">
-      <button class="back-btn" (click)="router.navigate(['/'])">← Search</button>
-      <div class="breadcrumbs">
-        @for (movie of store.visitedCenters(); track movie.id) {
-          <button class="breadcrumb-chip" (click)="onReCenter(movie.id)">
-            {{ movie.title }}@if (movie.year) { <span class="bc-year">{{ movie.year }}</span>}
-          </button>
+      <div class="nav-btns">
+        @if (canGoBack()) {
+          <button class="back-btn" (click)="goBack()">← Back</button>
         }
+        <button class="back-btn" (click)="router.navigate(['/'])">Search</button>
       </div>
+      <div class="toolbar-spacer"></div>
       <div class="controls">
         <span class="control-group" [class.disabled]="weightsActive()">
           <span class="control-label">MIN SCORE</span>

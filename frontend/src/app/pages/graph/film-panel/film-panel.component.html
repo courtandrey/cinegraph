@@ -1,6 +1,6 @@
 <div class="panel">
 
-  @if (breakdown && selectedMovie && center) {
+  @if (selectedMovie && center) {
 
     <div class="selected-header">
       @if (posterW92(selectedMovie.posterPath); as src) {
@@ -20,19 +20,23 @@
 
     <div class="section-header">WHY SIMILAR</div>
 
-    <div class="total-row">
-      <span class="total-label">Total score</span>
-      <span class="total-score">{{ breakdown.totalScore.toFixed(1) }}</span>
-    </div>
+    @if (breakdownReady && breakdown) {
+      <div class="total-row">
+        <span class="total-label">Total score</span>
+        <span class="total-score">{{ breakdown.totalScore.toFixed(1) }}</span>
+      </div>
 
-    <ul class="breakdown-list">
-      @for (comp of breakdown.components; track $index) {
-        <li class="breakdown-item">
-          <span class="comp-label">{{ componentLabel(comp) }}</span>
-          <span class="comp-score">+{{ comp.score.toFixed(1) }}</span>
-        </li>
-      }
-    </ul>
+      <ul class="breakdown-list">
+        @for (comp of breakdown.components; track $index) {
+          <li class="breakdown-item">
+            <span class="comp-label">{{ componentLabel(comp) }}</span>
+            <span class="comp-score">+{{ comp.score.toFixed(1) }}</span>
+          </li>
+        }
+      </ul>
+    } @else {
+      <div class="breakdown-loading">Loading…</div>
+    }
 
     <div class="panel-footer">
       <button class="back-center-btn" (click)="backToCenter.emit()">← Back to center</button>

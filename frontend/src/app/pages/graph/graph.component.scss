@@ -47,37 +47,15 @@
   }
 }
 
-.breadcrumbs {
+.nav-btns {
   display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  flex: 1;
-  min-width: 0;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
-.breadcrumb-chip {
-  background: $panel-2;
-  border: 1px solid $border;
-  border-radius: 3px;
-  color: $text;
-  font-size: 11px;
-  padding: 3px 8px;
-  cursor: pointer;
-  font-family: inherit;
-  white-space: nowrap;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  &:hover {
-    background: $border;
-    color: $text-bright;
-  }
-
-  .bc-year {
-    opacity: 0.6;
-    margin-left: 3px;
-  }
+.toolbar-spacer {
+  flex: 1;
+  min-width: 0;
 }
 
 .controls {
@@ -235,19 +213,14 @@
     }
   }
 
-  /* Keep the toolbar to one compact row; breadcrumbs scroll sideways. */
+  /* Compact toolbar; controls wrap to a second row instead of clipping. */
   .toolbar {
     gap: 8px;
     padding: 6px 10px;
   }
 
-  .breadcrumbs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar { display: none; }
+  .toolbar-spacer {
+    display: none;
   }
 
   .controls {

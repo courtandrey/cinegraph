@@ -25,11 +25,39 @@ export class FilmPanelComponent {
   }
 
   get selectedMovie(): MovieDetail | null {
-    if (!this.breakdown) return null;
-    const centerId = this.graph?.center.id;
-    return this.breakdown.movieA.id !== centerId
+    if (this.selectedNodeId == null || !this.graph) return null;
+    if (this.breakdownReady) {
+      const centerId = this.graph.center.id;
+      return this.breakdown!.movieA.id !== centerId
+        ? this.breakdown!.movieA
+        : this.breakdown!.movieB;
+    }
+    const node = this.graph.nodes.find(n => n.id === this.selectedNodeId);
+    return node
+      ? {
+          id: node.id,
+          title: node.title,
+          year: node.year,
+          posterPath: node.posterPath,
+          originalTitle: node.title,
+          releaseDate: null,
+          overview: '',
+          runtime: null,
+          genres: [],
+          countries: [],
+          voteAverage: 0
+        }
+      : null;
+  }
+
+  /** True only when the loaded breakdown actually belongs to the selected node. */
+  get breakdownReady(): boolean {
+    if (!this.breakdown || this.selectedNodeId == null || !this.graph) return false;
+    const centerId = this.graph.center.id;
+    const other = this.breakdown.movieA.id !== centerId
       ? this.breakdown.movieA
       : this.breakdown.movieB;
+    return other.id === this.selectedNodeId;
   }
 
   posterW342(path: string | null): string | null {
