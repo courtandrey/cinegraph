@@ -60,6 +60,7 @@
   list-style: none;
   z-index: 200;
   max-height: 420px;
+  max-height: min(420px, 50dvh);
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }

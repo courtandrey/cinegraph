@@ -7,7 +7,10 @@
 }
 
 html, body {
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: $bg;
   color: $text;
   font-family: "Graphik", "Helvetica Neue", Helvetica, Arial, sans-serif;
