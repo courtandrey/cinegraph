@@ -10,7 +10,6 @@ public class ScoringProperties {
     private double minCrewScore        = 1.0;
     private double perPersonCap        = 20.0;
     private int    maxCreditsPerPerson = 800;
-    private boolean singleRolePerPerson = true;
     private boolean includeMinorCast   = false;
     private int    buckets             = 64;
 
@@ -22,9 +21,6 @@ public class ScoringProperties {
 
     public int getMaxCreditsPerPerson()    { return maxCreditsPerPerson; }
     public void setMaxCreditsPerPerson(int v)    { this.maxCreditsPerPerson = v; }
-
-    public boolean isSingleRolePerPerson() { return singleRolePerPerson; }
-    public void setSingleRolePerPerson(boolean v){ this.singleRolePerPerson = v; }
 
     public boolean isIncludeMinorCast()    { return includeMinorCast; }
     public void setIncludeMinorCast(boolean v)   { this.includeMinorCast = v; }

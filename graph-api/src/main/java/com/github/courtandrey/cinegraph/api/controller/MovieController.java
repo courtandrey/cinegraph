@@ -69,7 +69,7 @@ public class MovieController {
         var center = movieRepo.findById(id);
         if (center.isEmpty()) return notFound("movie", id);
 
-        int cap = Math.min(Math.max(limit, 1), MAX_LIMIT);
+        int cap = Math.clamp(limit, 1, MAX_LIMIT);
 
         List<NeighborEdge> neighborEdges = edgeRepo.findNeighborEdges(id, minScore, cap);
         List<Long> neighborIds = neighborEdges.stream().map(NeighborEdge::neighborId).toList();

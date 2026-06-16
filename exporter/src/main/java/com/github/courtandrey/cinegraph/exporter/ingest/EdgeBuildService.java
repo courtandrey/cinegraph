@@ -72,7 +72,6 @@ public class EdgeBuildService {
     private static final Logger log = LoggerFactory.getLogger(EdgeBuildService.class);
     private static final long PASS2_CHUNK = 50_000L;
     private static final int DELETE_CHUNK = 5_000;
-    private static final int PERSONS_KEPT_PER_EDGE = 25;
     private static final int KEYWORD_SAMPLE = 10;
 
     private final DSLContext ctx;
@@ -144,6 +143,8 @@ public class EdgeBuildService {
             if (cancelled(cancelKey)) { runRepo.finish(runId, RunStatus.CANCELLED, stats.toJson()); return; }
 
             mergeEdgeCrew();
+            cleanUpAfterEdgeCrewBuild();
+            runRepo.updateStats(runId, stats.phaseJson("edgeCrewMerged", 1, 1));
             stats = runPass2(runId, incremental, cancelKey, stats);
 
             runRepo.finish(runId, RunStatus.COMPLETED, stats.toJson());
@@ -170,6 +171,13 @@ public class EdgeBuildService {
             ctx.truncate(EDGE_CREW).execute();
             ctx.truncate(DIRTY_SCOPE).execute();
         }).onFailure(e -> log.warn("Could not truncate scratch tables: {}", e.getMessage()));
+    }
+
+    private void cleanUpAfterEdgeCrewBuild() {
+        Try.run(() -> {
+            ctx.truncate(SCORED_CREDIT).execute();
+            ctx.truncate(EDGE_CREW_TMP).execute();
+        }).onFailure(e -> log.warn("Could not truncate cleanUp after edge-crew build tables: {}", e.getMessage()));
     }
 
     private void seedDirtyScope(List<Long> dirtyIds) {
@@ -247,7 +255,7 @@ public class EdgeBuildService {
         for (int bucket = 0; bucket < scoring.getBuckets() && !cancelled(cancelKey); bucket++) {
             stats = stats.plusPairs(insertPass1Bucket(bucket, incremental));
             if (bucket % 8 == 7) {
-                runRepo.updateStats(runId, stats.phaseJson("pass1", bucket + 1, scoring.getBuckets()));
+                runRepo.updateStats(runId, stats.phaseJson("edgeCrewCreation", bucket + 1, scoring.getBuckets()));
             }
         }
         log.info("[edge run {}] Pass 1 complete; {} raw pair rows", runId, stats.pass1Pairs());
@@ -324,21 +332,18 @@ public class EdgeBuildService {
 
         Field<JSONB> element = field(name("e", "e"), JSONB.class);
         Field<Float> elementScore = jsonbGetAttributeAsText(element, "score").cast(SQLDataType.REAL);
-        Table<?> top = select(element.as("e"))
+        Table<?> ordered = select(element.as("e"))
                 .from(PgSupport.jsonbArrayElements(agg.field("all_persons", JSONB.class)))
                 .orderBy(elementScore.desc())
-                .limit(PERSONS_KEPT_PER_EDGE)
                 .asTable("sub");
-        Field<JSONB> kept = top.field("e", JSONB.class);
-        Field<Float> keptScore = jsonbGetAttributeAsText(kept, "score").cast(SQLDataType.REAL);
-        Field<JSONB> trimmed = field(select(jsonbArrayAgg(kept).orderBy(keptScore.desc())).from(top));
+        Field<JSONB> components = ordered.field("e", JSONB.class);
 
         ctx.insertInto(EDGE_CREW,
                         EDGE_CREW.MOVIE_A, EDGE_CREW.MOVIE_B, EDGE_CREW.CREW_SCORE, EDGE_CREW.PERSONS)
                 .select(select(agg.field("movie_a", Long.class),
                                 agg.field("movie_b", Long.class),
                                 agg.field("crew_score", Float.class),
-                                trimmed)
+                                field(select(jsonbArrayAgg(components)).from(ordered)))
                         .from(agg))
                 .execute();
 
@@ -353,6 +358,7 @@ public class EdgeBuildService {
 
         for (long start = 0; start <= maxMovieA && !cancelled(cancelKey); start += PASS2_CHUNK) {
             stats = stats.plusInserted(insertPass2Chunk(start, start + PASS2_CHUNK - 1, incremental));
+            runRepo.updateStats(runId, stats.toJson());
         }
         log.info("[edge run {}] Pass 2 complete; {} edges total", runId, stats.edgesInserted());
         return stats;
@@ -360,7 +366,6 @@ public class EdgeBuildService {
 
     private int insertPass2Chunk(long chunkStart, long chunkEnd, boolean incremental) {
         var ec = EDGE_CREW.as("ec");
-        JSONB emptyArray = JSONB.valueOf("[]");
 
         Table<?> g = genreLateral(ec);
         Table<?> k = keywordLateral(ec);
