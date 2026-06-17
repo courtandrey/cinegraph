@@ -6,7 +6,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Slf4j
 public final class LetterboxdParsing {
 
     private LetterboxdParsing() {}
@@ -22,10 +21,6 @@ public final class LetterboxdParsing {
                 .map(TMDB_MOVIE_ID::matcher)
                 .filter(Matcher::find)
                 .map(matcher -> matcher.group(1))
-                .map(Long::parseLong)
-                .or(() -> {
-                    log.error("Could not parse tmdb id from {}", filmPageHtml);
-                    return Optional.empty();
-                });
+                .map(Long::parseLong);
     }
 }

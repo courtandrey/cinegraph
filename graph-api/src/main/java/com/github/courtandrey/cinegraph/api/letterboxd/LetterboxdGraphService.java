@@ -19,6 +19,7 @@ import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository.TitleYearM
 import com.github.courtandrey.cinegraph.api.service.GraphScoring;
 import com.github.courtandrey.cinegraph.api.service.TopReasonResolver;
 import io.vavr.control.Try;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -37,6 +38,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class LetterboxdGraphService {
 
     private static final int MAX_LIMIT = 100;
@@ -180,7 +182,11 @@ public class LetterboxdGraphService {
         return Optional.ofNullable(row.uri())
                 .filter(Predicate.not(String::isBlank))
                 .flatMap(client::filmPage)
-                .flatMap(LetterboxdParsing::parseTmdbId);
+                .flatMap(LetterboxdParsing::parseTmdbId)
+                .or(() -> {
+                    log.error("Could not parse tmdb id from {}", row.uri());
+                    return Optional.empty();
+                });
     }
 
     private List<LetterboxdGraph> assembleGraphs(List<Long> movieIds) {
