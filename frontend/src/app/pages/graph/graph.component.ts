@@ -26,14 +26,12 @@ export class GraphComponent implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly graph = signal<GraphPayload | null>(null);
   readonly centerId = signal(0);
-  /** Non-null when exploring a Letterboxd film set; scopes graph/reweight to that set. */
   readonly hash = signal<string | null>(null);
   readonly selectedNodeId = signal<number | null>(null);
   readonly selectedBreakdown = signal<EdgeBreakdown | null>(null);
   readonly weightsOpen = signal(false);
   readonly infoOpen = signal(false);
   readonly defaultWeights = signal<ReadonlyMap<string, number>>(new Map());
-  /** Live min-score slider position; the applied value (store.minScore) follows 500ms later. */
   readonly minScoreDisplay = signal(this.store.minScore());
   private minScoreTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -41,10 +39,6 @@ export class GraphComponent implements OnInit, OnDestroy {
 
   readonly weightsActive = computed(() => this.store.customWeights() !== null);
 
-  /**
-   * Upper bound of the min-score slider: the strongest edge to the centre minus 1, so
-   * the centre always keeps at least one neighbour even at the maximum threshold.
-   */
   readonly maxScore = computed(() => {
     const g = this.graph();
     const cid = this.centerId();
@@ -80,7 +74,6 @@ export class GraphComponent implements OnInit, OnDestroy {
       .sort((a, b) => b.count - a.count || b.weight - a.weight);
   });
 
-  // Guard against out-of-order HTTP responses overwriting newer state
   private graphRequestSeq = 0;
   private edgeRequestSeq = 0;
 
@@ -96,7 +89,6 @@ export class GraphComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Loads the graph: re-weighted server-side when custom weights are active, else stored scores. */
   fetchGraph(): void {
     const id = this.centerId();
     if (!id) return;
@@ -169,13 +161,11 @@ export class GraphComponent implements OnInit, OnDestroy {
     this.router.navigate(hash ? ['/letterboxd', hash, 'film', id] : ['/film', id]);
   }
 
-  /** Toolbar exit: back to the user-graph overview in Letterboxd mode, else search. */
   exit(): void {
     const hash = this.hash();
     this.router.navigate(hash ? ['/letterboxd', hash] : ['/']);
   }
 
-  /** Debounced: show the dragged value live, apply (fetch) 500ms after it settles. */
   onMinScoreInput(v: number): void {
     this.minScoreDisplay.set(v);
     if (this.minScoreTimer) clearTimeout(this.minScoreTimer);

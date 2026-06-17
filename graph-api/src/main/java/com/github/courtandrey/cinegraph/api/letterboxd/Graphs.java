@@ -43,11 +43,6 @@ public final class Graphs {
                 .toList();
     }
 
-    /**
-     * Caps a component to its {@code maxNodes} most-connected nodes (largest incident
-     * edge-score sum), then keeps only edges between survivors. Returns the component
-     * unchanged when already within the cap.
-     */
     public static Component capNodes(Component c, int maxNodes) {
         if (c.nodeIds().size() <= maxNodes) return c;
         Map<Long, Double> sums = edgeSums(c.edges());
@@ -62,7 +57,6 @@ public final class Graphs {
         return new Component(nodeIdsOf(edges), edges);
     }
 
-    /** Node with the largest sum of incident edge scores, or 0 when there are no edges. */
     public static long centerId(List<GraphEdge> edges) {
         return edgeSums(edges).entrySet().stream()
                 .max(Map.Entry.comparingByValue())

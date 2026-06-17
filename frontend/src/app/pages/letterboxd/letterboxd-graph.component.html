@@ -24,8 +24,10 @@
         (nodeTap)="onNodeTap($event)"
         (clearSelection)="onClearSelection()"
       />
+    } @else if (status() === 'error') {
+      <div class="empty-state">There is no such graph.</div>
     } @else {
-      <div class="empty-state">No graph to display.</div>
+      <div class="empty-state">The graph is loading…</div>
     }
 
     @if (store.count() > 1) {
@@ -43,13 +45,11 @@
 
       @if (selectedDetail(); as m) {
         <div class="detail-scroll">
-          @if (posterW342(m.posterPath); as src) {
-            <img class="detail-poster" [src]="src" [alt]="m.title"
-                 (error)="imgEl.hidden = true; fbEl.hidden = false" #imgEl />
-            <div class="detail-poster poster-placeholder" hidden #fbEl></div>
-          } @else {
-            <div class="detail-poster poster-placeholder"></div>
-          }
+          <div class="detail-poster">
+            @if (posterW342(m.posterPath); as src) {
+              <img [src]="src" [alt]="m.title" (error)="imgEl.hidden = true" #imgEl />
+            }
+          </div>
 
           <h2 class="detail-title">{{ m.title }}</h2>
           @if (m.year) { <div class="detail-year">{{ m.year }}</div> }

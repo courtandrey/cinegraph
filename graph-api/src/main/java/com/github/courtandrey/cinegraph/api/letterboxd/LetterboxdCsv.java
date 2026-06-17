@@ -10,11 +10,6 @@ import io.vavr.control.Try;
 
 import java.util.List;
 
-/**
- * Parses a Letterboxd CSV export ({@code Date,Name,Year,Letterboxd URI,Rating}) into
- * {@link FilmRow}s. Mapping is by header name, so column order and extra columns are
- * tolerated; {@code Rating} is retained (unused for now) for later weighting.
- */
 public final class LetterboxdCsv {
 
     private LetterboxdCsv() {}

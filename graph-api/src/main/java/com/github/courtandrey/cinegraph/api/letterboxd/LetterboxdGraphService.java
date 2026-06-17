@@ -36,12 +36,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-/**
- * Resolves an uploaded Letterboxd CSV to CineGraph movie ids (batched DB title+year
- * match, then sequential URI scraping for conflicts), persists the resolved set keyed
- * by the file hash, and assembles the overview sub-graphs. Re-centring and re-weighting
- * reuse the stored set so traversal stays scoped to the user's films.
- */
 @Service
 public class LetterboxdGraphService {
 
@@ -81,7 +75,6 @@ public class LetterboxdGraphService {
         return new LetterboxdUploadResponse(hash, assembleGraphs(movieIds));
     }
 
-    /** Rebuilds the overview graphs from the stored set, without the original file. */
     public List<LetterboxdGraph> overview(String hash) {
         return assembleGraphs(setRepo.loadMovieIds(hash));
     }
@@ -190,8 +183,6 @@ public class LetterboxdGraphService {
                 .flatMap(LetterboxdParsing::parseTmdbId);
     }
 
-    // ── overview assembly ────────────────────────────────────────────────────
-
     private List<LetterboxdGraph> assembleGraphs(List<Long> movieIds) {
         List<GraphEdge> edges = edgeRepo.findEdgesAmong(movieIds).stream()
                 .map(this::toGraphEdge)
@@ -226,8 +217,6 @@ public class LetterboxdGraphService {
         return movieRepo.findNodesByIds(ids).stream()
                 .collect(Collectors.toMap(GraphNode::id, Function.identity()));
     }
-
-    // ── edge mapping ─────────────────────────────────────────────────────────
 
     private GraphEdge toGraphEdge(NeighborEdge e) {
         JsonNode components = parseComponents(e.componentsJson());

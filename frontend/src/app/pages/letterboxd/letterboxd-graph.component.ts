@@ -24,11 +24,10 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   readonly selectedNodeId = signal<number | null>(null);
   readonly selectedDetail = signal<MovieDetail | null>(null);
-  /** Live slider position, shown immediately while dragging; seeded from the saved value. */
+  readonly status = signal<'loading' | 'ready' | 'error'>('ready');
   readonly thresholdDisplay = signal(this.store.inScoreThreshold());
   private thresholdTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** in-score (sum of incident edge scores) per node in the current full graph. */
   readonly inScoreById = computed(() => {
     const map = new Map<number, number>();
     const g = this.store.current();
@@ -46,7 +45,6 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     return Math.ceil(max);
   });
 
-  /** Graph with nodes below the in-score threshold (and their edges) pruned out. */
   readonly payload = computed<GraphPayload | null>(() => {
     const g = this.store.current();
     if (!g) return null;
@@ -65,7 +63,6 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   readonly centerId = computed(() => this.payload()?.center.id ?? 0);
 
-  /** Sum of incident edge scores for the selected node within the current full graph. */
   readonly selectedInScore = computed(() => {
     const id = this.selectedNodeId();
     return id == null ? 0 : (this.inScoreById().get(id) ?? 0);
@@ -79,12 +76,14 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (this.store.hash() === hash && this.store.count() > 0) return;
 
     // Store was lost (e.g. refresh / direct link) — rebuild from the persisted set.
+    this.status.set('loading');
     this.api.letterboxdOverview(hash).subscribe({
       next: graphs => {
-        if (!graphs.length) { this.router.navigate(['/']); return; }
+        if (!graphs.length) { this.status.set('error'); return; }
         this.store.set(hash, graphs);
+        this.status.set('ready');
       },
-      error: () => this.router.navigate(['/'])
+      error: () => this.status.set('error')
     });
   }
 
@@ -111,7 +110,6 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     const id = this.selectedNodeId();
     const hash = this.store.hash();
     if (id == null || !hash) return;
-    // Entering a deep-dive starts fresh; re-centring inside it keeps the value.
     this.graphStore.setMinScore(0);
     this.router.navigate(['/letterboxd', hash, 'film', id]);
   }

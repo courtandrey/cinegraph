@@ -14,11 +14,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
 
-/**
- * Read-only fetch of a single Letterboxd film page (the {@code Letterboxd URI} from a
- * CSV export, typically a {@code boxd.it} short link that redirects to the film page).
- * Returns empty on any non-200 / transport failure.
- */
 @Component
 @Slf4j
 public class LetterboxdClient {
