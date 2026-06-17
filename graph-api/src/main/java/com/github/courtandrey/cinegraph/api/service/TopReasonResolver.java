@@ -53,7 +53,7 @@ public class TopReasonResolver {
                 case "PRODUCTION_DESIGNER" -> "Same production designer";
                 case "COSTUME_DESIGNER"    -> "Same costume designer";
                 case "EXEC_PRODUCER"       -> "Same executive producer";
-                case "CAST_LEAD"           -> "Two leads in common";
+                case "CAST_LEAD"           -> "Lead actor in common";
                 case "CAST_SUPPORT"        -> "Supporting actor in common";
                 case "CAST_MINOR"          -> "Actor in common";
                 default                    -> name != null ? name : "Shared crew";

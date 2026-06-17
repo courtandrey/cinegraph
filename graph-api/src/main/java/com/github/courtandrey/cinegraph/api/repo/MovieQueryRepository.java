@@ -7,6 +7,7 @@ import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +15,7 @@ import static com.github.courtandrey.cinegraph.api.jooq.Tables.GENRE;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.MOVIE;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.MOVIE_GENRE;
 import static org.jooq.impl.DSL.inline;
+import static org.jooq.impl.DSL.lower;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 
@@ -75,6 +77,23 @@ public class MovieQueryRepository {
                         toDouble(r.value9()),
                         r.value10() == null ? List.of() : List.of(r.value10()),
                         r.value11()));
+    }
+
+    public record TitleYearMatch(long movieId, String title, String originalTitle, int year) {}
+
+    public List<TitleYearMatch> findByTitlesAndYears(Collection<String> lowerNames, Collection<Integer> years) {
+        if (lowerNames.isEmpty() || years.isEmpty()) return List.of();
+        List<Short> shortYears = years.stream().map(Integer::shortValue).toList();
+        return ctx.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.ORIGINAL_TITLE, MOVIE.RELEASE_YEAR)
+                .from(MOVIE)
+                .where(MOVIE.RELEASE_YEAR.in(shortYears))
+                .and(lower(MOVIE.TITLE).in(lowerNames)
+                        .or(lower(MOVIE.ORIGINAL_TITLE).in(lowerNames)))
+                .fetch(r -> new TitleYearMatch(
+                        r.value1(),
+                        r.value2(),
+                        r.value3(),
+                        r.value4() == null ? 0 : r.value4().intValue()));
     }
 
     public List<GraphNode> findNodesByIds(List<Long> ids) {

@@ -46,6 +46,17 @@ export interface GraphPayload {
   edges: GraphEdge[];
 }
 
+export interface LetterboxdGraph {
+  centerId: number;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export interface LetterboxdUploadResponse {
+  hash: string;
+  graphs: LetterboxdGraph[];
+}
+
 export interface EdgeComponent {
   type: 'SHARED_PERSON' | 'SHARED_GENRES' | 'SHARED_KEYWORDS' | 'RELEASE_PROXIMITY';
   score: number;

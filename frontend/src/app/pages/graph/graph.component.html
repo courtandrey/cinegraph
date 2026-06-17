@@ -6,20 +6,18 @@
         @if (canGoBack()) {
           <button class="back-btn" (click)="goBack()">← Back</button>
         }
-        <button class="back-btn" (click)="router.navigate(['/'])">Search</button>
+        <button class="back-btn" (click)="exit()">{{ hash() ? 'My graph' : 'Search' }}</button>
       </div>
       <div class="controls">
-        <span class="control-group" [class.disabled]="weightsActive()">
+        <span class="control-group">
           <span class="control-label">MIN SCORE</span>
           <input
-            type="range" min="12" max="60" step="1"
-            [value]="store.minScore()"
-            [disabled]="weightsActive()"
-            (change)="onMinScoreChange(+$any($event.target).value)"
+            type="range" min="0" [max]="maxScore()" step="1"
+            [value]="minScoreDisplay()"
+            (input)="onMinScoreInput(+$any($event.target).value)"
             class="slider"
-            [title]="weightsActive() ? 'Disabled while custom weights are applied' : ''"
           />
-          <span class="control-value">{{ store.minScore() }}</span>
+          <span class="control-value">{{ minScoreDisplay() }}</span>
         </span>
         <span class="control-group">
           <span class="control-label">LIMIT</span>

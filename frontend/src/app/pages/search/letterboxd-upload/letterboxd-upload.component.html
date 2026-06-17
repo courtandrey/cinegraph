@@ -1,0 +1,29 @@
+<div class="lbxd-upload">
+  <div class="divider"><span>or</span></div>
+
+  <div class="upload-row">
+    <button class="upload-btn" (click)="fileInput.click()" [disabled]="loading()">
+      Build a graph from your Letterboxd
+    </button>
+
+    <span class="help" tabindex="0">
+      ?
+      <span class="help-tip">
+        Export your data at
+        <a href="https://letterboxd.com/user/exportdata/" target="_blank" rel="noopener noreferrer">
+          letterboxd.com/user/exportdata/
+        </a>,
+        unzip the archive, then upload <strong>ratings.csv</strong> or <strong>watched.csv</strong>.
+      </span>
+    </span>
+
+    <input #fileInput type="file" accept=".csv,text/csv" hidden (change)="onFile($event)" />
+  </div>
+
+  @if (loading()) {
+    <p class="status">Building your graph — fetching films can take a moment…</p>
+  }
+  @if (error(); as e) {
+    <p class="status error">{{ e }}</p>
+  }
+</div>

@@ -42,7 +42,7 @@ public class MovieController {
         this.mapper    = mapper;
     }
 
-    public record ReweightRequest(Integer limit, Map<String, Double> weights) {}
+    public record ReweightRequest(Integer limit, Map<String, Double> weights, Float minScore) {}
 
     @GetMapping("/search")
     public ResponseEntity<?> search(@RequestParam String q,
@@ -97,11 +97,12 @@ public class MovieController {
 
         Map<String, Double> weights = graphScoring.effectiveWeights(req.weights());
         int limit = Math.clamp(req.limit() == null ? DEFAULT_LIMIT : req.limit(), 1, MAX_LIMIT);
+        float minScore = req.minScore() == null ? 0f : req.minScore();
 
         List<GraphEdge> centerEdges = edgeRepo.findNeighborEdges(id, 0f, scoringProps.getMaxEdgeCandidates())
                 .stream()
                 .map(e -> reweightEdge(e, weights))
-                .filter(java.util.Objects::nonNull)
+                .filter(e -> e.score() >= minScore)
                 .sorted(Comparator.comparingDouble(GraphEdge::score).reversed())
                 .limit(limit)
                 .toList();
@@ -114,6 +115,7 @@ public class MovieController {
         List<GraphEdge> edges = new ArrayList<>(centerEdges);
         edgeRepo.findInterNeighborEdges(neighborIds, 0f).stream()
                 .map(e -> reweightEdge(e, weights))
+                .filter(e -> e.score() >= minScore)
                 .forEach(edges::add);
 
         return ResponseEntity.ok(new GraphPayload(center.get(), nodes, edges));

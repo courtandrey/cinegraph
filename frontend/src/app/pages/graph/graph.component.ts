@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, inject } from '@angular/core';
 import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GraphCanvasComponent } from './graph-canvas/graph-canvas.component';
@@ -16,7 +16,7 @@ import { GraphPayload, GraphNode, MovieDetail, EdgeBreakdown, RoleWeight } from 
   templateUrl: './graph.component.html',
   styleUrl: './graph.component.scss'
 })
-export class GraphComponent implements OnInit {
+export class GraphComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   readonly router = inject(Router);
   private location = inject(Location);
@@ -26,15 +26,35 @@ export class GraphComponent implements OnInit {
   readonly loading = signal(false);
   readonly graph = signal<GraphPayload | null>(null);
   readonly centerId = signal(0);
+  /** Non-null when exploring a Letterboxd film set; scopes graph/reweight to that set. */
+  readonly hash = signal<string | null>(null);
   readonly selectedNodeId = signal<number | null>(null);
   readonly selectedBreakdown = signal<EdgeBreakdown | null>(null);
   readonly weightsOpen = signal(false);
   readonly infoOpen = signal(false);
   readonly defaultWeights = signal<ReadonlyMap<string, number>>(new Map());
+  /** Live min-score slider position; the applied value (store.minScore) follows 500ms later. */
+  readonly minScoreDisplay = signal(this.store.minScore());
+  private minScoreTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly limitOptions = [25, 40, 75, 100];
 
   readonly weightsActive = computed(() => this.store.customWeights() !== null);
+
+  /**
+   * Upper bound of the min-score slider: the strongest edge to the centre minus 1, so
+   * the centre always keeps at least one neighbour even at the maximum threshold.
+   */
+  readonly maxScore = computed(() => {
+    const g = this.graph();
+    const cid = this.centerId();
+    if (!g) return 60;
+    const centerScores = g.edges
+      .filter(e => e.source === cid || e.target === cid)
+      .map(e => e.score);
+    if (!centerScores.length) return 0;
+    return Math.max(0, Math.floor(Math.max(...centerScores)) - 1);
+  });
 
   readonly canGoBack = computed(() => this.store.visitedCenters().length > 1);
 
@@ -70,6 +90,7 @@ export class GraphComponent implements OnInit {
       error: () => this.defaultWeights.set(new Map())
     });
     this.route.params.subscribe(params => {
+      this.hash.set(params['hash'] ?? null);
       this.centerId.set(Number(params['id']));
       this.fetchGraph();
     });
@@ -84,10 +105,15 @@ export class GraphComponent implements OnInit {
     this.selectedBreakdown.set(null);
 
     const weights = this.store.customWeights();
+    const hash = this.hash();
     const seq = ++this.graphRequestSeq;
-    const request$ = weights
-      ? this.api.reweightGraph(id, this.store.limit(), weights)
-      : this.api.getGraph(id, this.store.minScore(), this.store.limit());
+    const request$ = hash
+      ? (weights
+          ? this.api.letterboxdReweight(hash, id, this.store.limit(), weights, this.store.minScore())
+          : this.api.letterboxdRecenter(hash, id, this.store.minScore(), this.store.limit()))
+      : (weights
+          ? this.api.reweightGraph(id, this.store.limit(), weights, this.store.minScore())
+          : this.api.getGraph(id, this.store.minScore(), this.store.limit()));
 
     request$.subscribe({
       next: payload => {
@@ -139,12 +165,30 @@ export class GraphComponent implements OnInit {
 
   onReCenter(id: number): void {
     this.infoOpen.set(false);
-    this.router.navigate(['/film', id]);
+    const hash = this.hash();
+    this.router.navigate(hash ? ['/letterboxd', hash, 'film', id] : ['/film', id]);
+  }
+
+  /** Toolbar exit: back to the user-graph overview in Letterboxd mode, else search. */
+  exit(): void {
+    const hash = this.hash();
+    this.router.navigate(hash ? ['/letterboxd', hash] : ['/']);
+  }
+
+  /** Debounced: show the dragged value live, apply (fetch) 500ms after it settles. */
+  onMinScoreInput(v: number): void {
+    this.minScoreDisplay.set(v);
+    if (this.minScoreTimer) clearTimeout(this.minScoreTimer);
+    this.minScoreTimer = setTimeout(() => this.onMinScoreChange(v), 500);
   }
 
   onMinScoreChange(v: number): void {
     this.store.setMinScore(v);
     this.fetchGraph();
+  }
+
+  ngOnDestroy(): void {
+    if (this.minScoreTimer) clearTimeout(this.minScoreTimer);
   }
 
   onLimitChange(v: number): void {

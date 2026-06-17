@@ -11,5 +11,15 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/graph/graph.component').then(m => m.GraphComponent)
   },
+  {
+    path: 'letterboxd/:hash/film/:id',
+    loadComponent: () =>
+      import('./pages/graph/graph.component').then(m => m.GraphComponent)
+  },
+  {
+    path: 'letterboxd/:hash',
+    loadComponent: () =>
+      import('./pages/letterboxd/letterboxd-graph.component').then(m => m.LetterboxdGraphComponent)
+  },
   { path: '**', redirectTo: '' }
 ];

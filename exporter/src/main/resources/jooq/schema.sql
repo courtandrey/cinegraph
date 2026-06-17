@@ -128,3 +128,10 @@ CREATE TABLE edge_crew (
 CREATE TABLE dirty_scope (
     movie_id BIGINT PRIMARY KEY
 );
+
+CREATE TABLE letterboxd_set (
+    hash     VARCHAR NOT NULL,
+    movie_id BIGINT NOT NULL,
+    rating   REAL,
+    PRIMARY KEY (hash, movie_id)
+);

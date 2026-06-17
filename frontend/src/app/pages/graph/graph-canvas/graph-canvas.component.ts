@@ -32,6 +32,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
   @Input() centerId!: number;
   @Input() minScore = 12;
   @Input() selectedNodeId: number | null = null;
+  @Input() layoutByInScore = false;
 
   @Output() nodeTap = new EventEmitter<number>();
   @Output() clearSelection = new EventEmitter<void>();
@@ -62,6 +63,10 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
     } else if (changes['selectedNodeId']) {
       this.applySelection();
     }
+  }
+
+  hideTooltip(): void {
+    this.tooltipVisible.set(false);
   }
 
   ngOnDestroy(): void {
@@ -398,13 +403,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
     const neighbors = (this.graph?.nodes ?? [])
       .filter(n => n.id !== cid)
-      .map(n => {
-        const edge = (this.graph?.edges ?? []).find(e =>
-          (e.source === cid && e.target === n.id) ||
-          (e.source === n.id && e.target === cid)
-        );
-        return { id: String(n.id), score: edge?.score ?? 0 };
-      })
+      .map(n => ({ id: String(n.id), score: this.layoutScore(n.id, cid) }))
       .sort((a, b) => b.score - a.score);
 
     const bandMap = new Map<number, string[]>();
@@ -453,5 +452,18 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
       fit,
       padding: this.fitPadding()
     };
+  }
+
+  private layoutScore(nodeId: number, centerId: number): number {
+    const edges = this.graph?.edges ?? [];
+    if (this.layoutByInScore) {
+      return edges
+        .filter(e => e.source === nodeId || e.target === nodeId)
+        .reduce((sum, e) => sum + e.score, 0);
+    }
+    const edge = edges.find(e =>
+      (e.source === centerId && e.target === nodeId) ||
+      (e.source === nodeId && e.target === centerId));
+    return edge?.score ?? 0;
   }
 }
