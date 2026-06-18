@@ -41,7 +41,7 @@
 
   @if (selectedNodeId() !== null) {
     <aside class="side-panel">
-      <button class="panel-collapse" (click)="onClearSelection()">▾ Close</button>
+      <button class="panel-collapse" (click)="onClearSelection()">▾ Collapse</button>
 
       @if (selectedDetail(); as m) {
         <div class="detail-scroll">
@@ -81,7 +81,7 @@
           }
         </div>
       } @else {
-        <div class="detail-loading">Loading…</div>
+        <div class="empty-state">Loading…</div>
       }
 
       <div class="panel-footer">
