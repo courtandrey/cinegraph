@@ -61,6 +61,8 @@ services:
     restart: unless-stopped
     depends_on:
       - graph-api
+    environment:
+      GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
     expose:
       - "80"
     networks: [cinegraph]
