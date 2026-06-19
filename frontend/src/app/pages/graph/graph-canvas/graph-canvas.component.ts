@@ -249,12 +249,15 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
     const c = this.graph.center;
     const centerId = this.centerId;
 
+    const nodeIds = new Set<number>([c.id]);
+
     elements.push({
       data: { id: String(c.id), label: c.title, posterPath: c.posterPath, score: 99999, isCenter: true }
     });
 
     for (const n of this.graph.nodes) {
       if (n.id === c.id) continue;
+      nodeIds.add(n.id);
       const edge = this.graph.edges.find(e =>
         (e.source === centerId && e.target === n.id) ||
         (e.source === n.id && e.target === centerId)
@@ -265,6 +268,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
     }
 
     for (const e of this.graph.edges) {
+      if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) continue;
       const isCenterEdge = e.source === centerId || e.target === centerId;
       elements.push({
         data: {

@@ -23,7 +23,11 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.CREDIT;
+import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.EDGE;
 import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.MOVIE;
+import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.MOVIE_GENRE;
+import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.MOVIE_KEYWORD;
 import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.MOVIE_RAW;
 
 /**
@@ -255,6 +259,12 @@ public class FetchPipeline {
     }
 
     private void deleteMovie(long movieId) {
+        ctx.deleteFrom(EDGE)
+                .where(EDGE.MOVIE_A.eq(movieId).or(EDGE.MOVIE_B.eq(movieId)))
+                .execute();
+        ctx.deleteFrom(CREDIT).where(CREDIT.MOVIE_ID.eq(movieId)).execute();
+        ctx.deleteFrom(MOVIE_GENRE).where(MOVIE_GENRE.MOVIE_ID.eq(movieId)).execute();
+        ctx.deleteFrom(MOVIE_KEYWORD).where(MOVIE_KEYWORD.MOVIE_ID.eq(movieId)).execute();
         ctx.deleteFrom(MOVIE).where(MOVIE.MOVIE_ID.eq(movieId)).execute();
         ctx.deleteFrom(MOVIE_RAW).where(MOVIE_RAW.MOVIE_ID.eq(movieId)).execute();
     }
