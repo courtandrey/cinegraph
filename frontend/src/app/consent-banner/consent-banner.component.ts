@@ -10,7 +10,6 @@ import { AnalyticsService } from '../services/analytics.service';
 export class ConsentBannerComponent {
   private analytics = inject(AnalyticsService);
 
-  // Only prompt when analytics is actually available and the user hasn't chosen yet.
   readonly visible = signal(this.analytics.enabled && this.analytics.consentState() === 'unset');
 
   accept(): void {
