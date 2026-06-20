@@ -12,6 +12,8 @@ public class LetterboxdProperties {
             + "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
     private int maxGraphNodes = 500;
     private int minGraphNodes = 1;
+    private int minEdgesPerNode = 5;
+    private float minScoreForNonEssential = 12f;
 
     public String getUserAgent()       { return userAgent; }
     public void setUserAgent(String v) { this.userAgent = v; }
@@ -21,4 +23,10 @@ public class LetterboxdProperties {
 
     public int getMinGraphNodes()      { return minGraphNodes; }
     public void setMinGraphNodes(int v) { this.minGraphNodes = v; }
+
+    public int getMinEdgesPerNode()      { return minEdgesPerNode; }
+    public void setMinEdgesPerNode(int v) { this.minEdgesPerNode = v; }
+
+    public float getMinScoreForNonEssential()      { return minScoreForNonEssential; }
+    public void setMinScoreForNonEssential(float v) { this.minScoreForNonEssential = v; }
 }

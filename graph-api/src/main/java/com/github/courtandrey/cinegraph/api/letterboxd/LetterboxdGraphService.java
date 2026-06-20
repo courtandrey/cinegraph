@@ -129,8 +129,6 @@ public class LetterboxdGraphService {
         });
     }
 
-    // ── resolution ───────────────────────────────────────────────────────────
-
     private List<Long> resolveAndStore(String hash, String csv) {
         List<MovieRating> resolved = resolveRows(LetterboxdCsv.parse(csv));
         setRepo.save(hash, resolved);
@@ -196,6 +194,7 @@ public class LetterboxdGraphService {
 
         List<Graphs.Component> components = Graphs.components(edges).stream()
                 .map(c -> Graphs.capNodes(c, props.getMaxGraphNodes()))
+                .map(c -> Graphs.capEdgesPerNode(c, props.getMinEdgesPerNode(), props.getMinScoreForNonEssential()))
                 .filter(c -> c.nodeIds().size() >= props.getMinGraphNodes())
                 .toList();
 
