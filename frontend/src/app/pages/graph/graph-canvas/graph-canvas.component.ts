@@ -17,6 +17,10 @@ import cytoscape, { Core, ElementDefinition } from 'cytoscape';
 import { GraphPayload } from '../../../models/movie.model';
 
 const POSTER_W185 = 'https://image.tmdb.org/t/p/w185';
+const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
+
+const LARGE_NODE_COUNT = 150;
+const LARGE_EDGE_COUNT = 400;
 
 @Component({
   selector: 'app-graph-canvas',
@@ -43,6 +47,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
   readonly tooltipText = signal('');
 
   private cy: Core | null = null;
+  private large = false;
   private lastLayoutCenter: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private resizeRaf = 0;
@@ -105,11 +110,18 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
   private initCytoscape(): void {
     this.ngZone.runOutsideAngular(() => {
       this.lastLayoutCenter = this.centerId;
+      this.large =
+        (this.graph?.nodes?.length ?? 0) > LARGE_NODE_COUNT ||
+        (this.graph?.edges?.length ?? 0) > LARGE_EDGE_COUNT;
       this.cy = cytoscape({
         container: this.containerRef.nativeElement,
         elements: this.buildElements(),
         style: this.buildStyle() as any,
-        layout: this.buildLayout(true) as any
+        layout: this.buildLayout(true) as any,
+        motionBlur: false,
+        // Cap device pixels on big graphs so each pan/zoom frame fills ~4× fewer
+        // pixels on hi-dpi screens. Edges stay drawn every frame (no blanking).
+        pixelRatio: this.large ? 1 : 'auto'
       });
 
       this.cy.on('tap', 'node', evt => {
@@ -189,21 +201,23 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
       const defs = this.buildElements();
       const defIds = new Set(defs.map(d => String(d.data['id'])));
 
-      cy.elements().filter(ele => !defIds.has(ele.id())).remove();
+      cy.batch(() => {
+        cy.elements().filter(ele => !defIds.has(ele.id())).remove();
 
-      const existing = new Set(cy.elements().map(ele => ele.id()));
-      for (const def of defs) {
-        const id = String(def.data['id']);
-        if (existing.has(id)) {
-          const ele = cy.$id(id);
-          ele.data(def.data as any);
-          ele.classes((def.classes as string) ?? '');
-        } else {
-          cy.add(def);
+        const existing = new Set(cy.elements().map(ele => ele.id()));
+        for (const def of defs) {
+          const id = String(def.data['id']);
+          if (existing.has(id)) {
+            const ele = cy.$id(id);
+            ele.data(def.data as any);
+            ele.classes((def.classes as string) ?? '');
+          } else {
+            cy.add(def);
+          }
         }
-      }
 
-      cy.style(this.buildStyle() as any);
+        cy.style(this.buildStyle() as any);
+      });
 
       const fit = this.lastLayoutCenter !== this.centerId;
       this.lastLayoutCenter = this.centerId;
@@ -217,29 +231,31 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
     if (!this.cy) return;
     this.ngZone.runOutsideAngular(() => {
       const cy = this.cy!;
-      cy.elements().removeClass('selected dimmed active edge-lit');
+      cy.batch(() => {
+        cy.elements().removeClass('selected dimmed active edge-lit');
 
-      const nodeId = this.selectedNodeId;
-      if (nodeId == null) return;
+        const nodeId = this.selectedNodeId;
+        if (nodeId == null) return;
 
-      const sel = cy.$(`#${nodeId}`);
-      if (!sel.length) return;
-      sel.addClass('selected');
+        const sel = cy.$(`#${nodeId}`);
+        if (!sel.length) return;
+        sel.addClass('selected');
 
-      const adjEdges = sel.connectedEdges();
-      const adjNodes = adjEdges.connectedNodes();
+        const adjEdges = sel.connectedEdges();
+        const adjNodes = adjEdges.connectedNodes();
 
-      // Dim non-adjacent nodes
-      cy.nodes()
-        .difference(sel)
-        .difference(adjNodes)
-        .addClass('dimmed');
+        // Dim non-adjacent nodes
+        cy.nodes()
+          .difference(sel)
+          .difference(adjNodes)
+          .addClass('dimmed');
 
-      cy.edges('.center-edge')
-        .difference(adjEdges)
-        .addClass('dimmed');
+        cy.edges('.center-edge')
+          .difference(adjEdges)
+          .addClass('dimmed');
 
-      adjEdges.filter('.inter-neighbor').addClass('active');
+        adjEdges.filter('.inter-neighbor').addClass('active');
+      });
     });
   }
 
@@ -251,6 +267,12 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
     const nodeIds = new Set<number>([c.id]);
 
+    const centerScore = new Map<number, number>();
+    for (const e of this.graph.edges) {
+      if (e.source === centerId) centerScore.set(e.target, e.score);
+      else if (e.target === centerId) centerScore.set(e.source, e.score);
+    }
+
     elements.push({
       data: { id: String(c.id), label: c.title, posterPath: c.posterPath, score: 99999, isCenter: true }
     });
@@ -258,12 +280,8 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
     for (const n of this.graph.nodes) {
       if (n.id === c.id) continue;
       nodeIds.add(n.id);
-      const edge = this.graph.edges.find(e =>
-        (e.source === centerId && e.target === n.id) ||
-        (e.source === n.id && e.target === centerId)
-      );
       elements.push({
-        data: { id: String(n.id), label: n.title, posterPath: n.posterPath, score: edge?.score ?? 0, isCenter: false }
+        data: { id: String(n.id), label: n.title, posterPath: n.posterPath, score: centerScore.get(n.id) ?? 0, isCenter: false }
       });
     }
 
@@ -292,6 +310,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
       .map(e => e.score);
     const maxScore = centerScores.length ? Math.max(...centerScores) : 80;
     const minScore = this.minScore;
+    const posterBase = this.large ? POSTER_W92 : POSTER_W185;
 
     return [
       {
@@ -303,7 +322,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
           'background-color': '#2c3440',
           'background-image': (ele: any) => {
             const p = ele.data('posterPath') as string | null;
-            return p ? `${POSTER_W185}${p}` : 'none';
+            return p ? `${posterBase}${p}` : 'none';
           },
           'background-fit': 'cover',
           'background-clip': 'node',
@@ -371,6 +390,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
       {
         selector: 'edge.inter-neighbor',
         style: {
+          'curve-style': this.large ? 'straight' : 'bezier',
           'line-color': 'rgba(154,170,187,0.5)',
           width: 1,
           opacity: 0.08
@@ -404,10 +424,24 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
     const cid = this.centerId;
     const centerId = String(cid);
+    const edges = this.graph?.edges ?? [];
+
+    const scoreByNode = new Map<number, number>();
+    if (this.layoutByInScore) {
+      for (const e of edges) {
+        scoreByNode.set(e.source, (scoreByNode.get(e.source) ?? 0) + e.score);
+        scoreByNode.set(e.target, (scoreByNode.get(e.target) ?? 0) + e.score);
+      }
+    } else {
+      for (const e of edges) {
+        if (e.source === cid) scoreByNode.set(e.target, e.score);
+        else if (e.target === cid) scoreByNode.set(e.source, e.score);
+      }
+    }
 
     const neighbors = (this.graph?.nodes ?? [])
       .filter(n => n.id !== cid)
-      .map(n => ({ id: String(n.id), score: this.layoutScore(n.id, cid) }))
+      .map(n => ({ id: String(n.id), score: scoreByNode.get(n.id) ?? 0 }))
       .sort((a, b) => b.score - a.score);
 
     const bandMap = new Map<number, string[]>();
@@ -456,18 +490,5 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
       fit,
       padding: this.fitPadding()
     };
-  }
-
-  private layoutScore(nodeId: number, centerId: number): number {
-    const edges = this.graph?.edges ?? [];
-    if (this.layoutByInScore) {
-      return edges
-        .filter(e => e.source === nodeId || e.target === nodeId)
-        .reduce((sum, e) => sum + e.score, 0);
-    }
-    const edge = edges.find(e =>
-      (e.source === centerId && e.target === nodeId) ||
-      (e.source === nodeId && e.target === centerId));
-    return edge?.score ?? 0;
   }
 }
