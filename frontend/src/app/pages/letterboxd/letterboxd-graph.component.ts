@@ -72,7 +72,6 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (!hash) { this.router.navigate(['/']); return; }
     if (this.store.hash() === hash && this.store.count() > 0) return;
 
-    // Store was lost (e.g. refresh / direct link) — rebuild from the persisted set.
     this.status.set('loading');
     this.api.letterboxdOverview(hash).subscribe({
       next: graphs => {
@@ -108,6 +107,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     const hash = this.store.hash();
     if (id == null || !hash) return;
     this.graphStore.setMinScore(0);
+    this.graphStore.resetLimit();
     this.router.navigate(['/letterboxd', hash, 'film', id]);
   }
 

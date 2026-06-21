@@ -6,8 +6,10 @@ export class GraphStore {
   private _visitedCenters = signal<MovieSummary[]>([]);
   readonly visitedCenters = this._visitedCenters.asReadonly();
 
+  static readonly DEFAULT_LIMIT = 25;
+
   private _minScore = signal(12);
-  private _limit = signal(40);
+  private _limit = signal(GraphStore.DEFAULT_LIMIT);
   readonly minScore = this._minScore.asReadonly();
   readonly limit = this._limit.asReadonly();
 
@@ -27,4 +29,6 @@ export class GraphStore {
 
   setMinScore(v: number): void { this._minScore.set(v); }
   setLimit(v: number): void { this._limit.set(v); }
+
+  resetLimit(): void { this._limit.set(GraphStore.DEFAULT_LIMIT); }
 }

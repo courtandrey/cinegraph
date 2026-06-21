@@ -22,12 +22,11 @@
         <span class="control-group">
           <span class="control-label">LIMIT</span>
           <select
-            [value]="store.limit()"
             (change)="onLimitChange(+$any($event.target).value)"
             class="select"
           >
             @for (opt of limitOptions; track opt) {
-              <option [value]="opt">{{ opt }}</option>
+              <option [value]="opt" [selected]="opt === store.limit()">{{ opt }}</option>
             }
           </select>
         </span>

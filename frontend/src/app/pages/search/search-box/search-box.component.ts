@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { MovieApiService } from '../../../services/movie-api.service';
+import { GraphStore } from '../../../services/graph-store.service';
 import { MovieSummary } from '../../../models/movie.model';
 
 const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
@@ -19,6 +20,7 @@ const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
 export class SearchBoxComponent {
   private router = inject(Router);
   private api = inject(MovieApiService);
+  private graphStore = inject(GraphStore);
   private destroyRef = inject(DestroyRef);
 
   readonly searchControl = new FormControl('');
@@ -84,6 +86,7 @@ export class SearchBoxComponent {
   select(movie: MovieSummary): void {
     this.searchControl.setValue(movie.title, { emitEvent: false });
     this.close();
+    this.graphStore.resetLimit();
     this.router.navigate(['/film', movie.id]);
   }
 
