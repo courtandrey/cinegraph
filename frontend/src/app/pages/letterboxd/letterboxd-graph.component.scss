@@ -2,19 +2,24 @@
 
 .lbxd-page {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
   position: relative;
 }
 
+.body,
 .canvas-area {
   flex: 1;
   position: relative;
   display: flex;
-  flex-direction: column;
   overflow: hidden;
   min-width: 0;
+}
+
+.canvas-area {
+  flex-direction: column;
 }
 
 .toolbar {
@@ -119,7 +124,6 @@
   font-size: 15px;
   cursor: pointer;
   font-family: inherit;
-  transition: border-color 0.15s, color 0.15s;
 
   &:hover:not(:disabled) {
     border-color: $accent-green;

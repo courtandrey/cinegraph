@@ -1,46 +1,47 @@
 <div class="lbxd-page">
-  <div class="canvas-area">
-    <div class="toolbar">
-      <button class="back-btn" (click)="router.navigate(['/'])">Search</button>
-      <span class="title-hint">Your Letterboxd graph — click a film to inspect it</span>
-      <span class="control-group">
-        <span class="control-label">MIN IN-SCORE</span>
-        <input
-          type="range" min="0" [max]="maxInScore()" step="1"
-          [value]="thresholdDisplay()"
-          (input)="setThreshold(+$any($event.target).value)"
-          class="slider"
-        />
-        <span class="control-value">{{ thresholdDisplay() }}</span>
-      </span>
-    </div>
-
-    @if (payload(); as p) {
-      <app-graph-canvas
-        [graph]="p"
-        [centerId]="centerId()"
-        [layoutByInScore]="true"
-        [selectedNodeId]="selectedNodeId()"
-        (nodeTap)="onNodeTap($event)"
-        (clearSelection)="onClearSelection()"
+  <div class="toolbar">
+    <button class="back-btn" (click)="router.navigate(['/'])">Search</button>
+    <span class="title-hint">Your Letterboxd graph — click a film to inspect it</span>
+    <span class="control-group">
+      <span class="control-label">MIN IN-SCORE</span>
+      <input
+        type="range" min="0" [max]="maxInScore()" step="1"
+        [value]="thresholdDisplay()"
+        (input)="setThreshold(+$any($event.target).value)"
+        class="slider"
       />
-    } @else if (status() === 'error') {
-      <div class="empty-state">There is no such graph.</div>
-    } @else {
-      <div class="empty-state">The graph is loading…</div>
-    }
-
-    @if (store.count() > 1) {
-      <div class="graph-switcher">
-        <button class="arrow" (click)="prev()" [disabled]="store.index() === 0" aria-label="Previous graph">←</button>
-        <span class="counter">{{ store.index() + 1 }}/{{ store.count() }}</span>
-        <button class="arrow" (click)="next()" [disabled]="store.index() === store.count() - 1" aria-label="Next graph">→</button>
-      </div>
-    }
+      <span class="control-value">{{ thresholdDisplay() }}</span>
+    </span>
   </div>
 
-  @if (selectedNodeId() !== null) {
-    <aside class="side-panel">
+  <div class="body">
+    <div class="canvas-area">
+      @if (payload(); as p) {
+        <app-graph-canvas
+          [graph]="p"
+          [centerId]="centerId()"
+          [layoutByInScore]="true"
+          [selectedNodeId]="selectedNodeId()"
+          (nodeTap)="onNodeTap($event)"
+          (clearSelection)="onClearSelection()"
+        />
+      } @else if (status() === 'error') {
+        <div class="empty-state">There is no such graph.</div>
+      } @else {
+        <div class="empty-state">The graph is loading…</div>
+      }
+
+      @if (store.count() > 1) {
+        <div class="graph-switcher">
+          <button class="arrow" (click)="prev()" [disabled]="store.index() === 0" aria-label="Previous graph">←</button>
+          <span class="counter">{{ store.index() + 1 }}/{{ store.count() }}</span>
+          <button class="arrow" (click)="next()" [disabled]="store.index() === store.count() - 1" aria-label="Next graph">→</button>
+        </div>
+      }
+    </div>
+
+    @if (selectedNodeId() !== null) {
+      <aside class="side-panel">
       <button class="panel-collapse" (click)="onClearSelection()">▾ Collapse</button>
 
       @if (selectedDetail(); as m) {
@@ -88,5 +89,6 @@
         <button class="deep-dive-btn" (click)="deepDive()">DEEP DIVE</button>
       </div>
     </aside>
-  }
+    }
+  </div>
 </div>
