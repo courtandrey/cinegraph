@@ -192,35 +192,41 @@ public class LetterboxdGraphService {
                 .map(this::toGraphEdge)
                 .toList();
 
-        List<Graphs.Component> components = Graphs.components(edges).stream()
-                .map(c -> Graphs.capNodes(c, props.getMaxGraphNodes()))
-                .map(c -> Graphs.capEdgesPerNode(c, props.getMinEdgesPerNode(), props.getMinScoreForNonEssential()))
-                .filter(c -> c.nodeIds().size() >= props.getMinGraphNodes())
-                .toList();
+        List<Built> built = new ArrayList<>();
+        for (Graphs.Component comp : Graphs.components(edges)) {
+            Graphs.Component withNodes = Graphs.capNodes(comp, props.getMaxGraphNodes());
+            Map<Long, Double> inScore = Graphs.edgeSums(withNodes.edges());
+            Graphs.Component view = Graphs.capEdgesPerNode(
+                    withNodes, props.getMinEdgesPerNode(), props.getMinScoreForNonEssential());
+            if (view.nodeIds().size() >= props.getMinGraphNodes()) {
+                built.add(new Built(view, inScore));
+            }
+        }
 
-        Map<Long, GraphNode> nodeById = nodesById(components);
+        List<Long> ids = built.stream().flatMap(b -> b.view().nodeIds().stream()).distinct().toList();
+        Map<Long, GraphNode> nodeById = movieRepo.findNodesByIds(ids).stream()
+                .collect(Collectors.toMap(GraphNode::id, Function.identity()));
 
-        return components.stream()
-                .map(c -> toGraph(c, nodeById))
+        return built.stream()
+                .map(b -> toGraph(b.view(), b.inScore(), nodeById))
                 .sorted(Comparator.comparingInt((LetterboxdGraph g) -> g.nodes().size()).reversed())
                 .toList();
     }
 
-    private LetterboxdGraph toGraph(Graphs.Component c, Map<Long, GraphNode> nodeById) {
+    private record Built(Graphs.Component view, Map<Long, Double> inScore) {}
+
+    private LetterboxdGraph toGraph(Graphs.Component c, Map<Long, Double> inScore,
+                                    Map<Long, GraphNode> nodeById) {
         List<GraphNode> nodes = c.nodeIds().stream()
                 .map(nodeById::get)
                 .filter(Objects::nonNull)
+                .map(n -> n.withInScore(inScore.getOrDefault(n.id(), 0.0)))
                 .toList();
-        return new LetterboxdGraph(Graphs.centerId(c.edges()), nodes, c.edges());
-    }
-
-    private Map<Long, GraphNode> nodesById(List<Graphs.Component> components) {
-        List<Long> ids = components.stream()
-                .flatMap(c -> c.nodeIds().stream())
-                .distinct()
-                .toList();
-        return movieRepo.findNodesByIds(ids).stream()
-                .collect(Collectors.toMap(GraphNode::id, Function.identity()));
+        long center = inScore.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(0L);
+        return new LetterboxdGraph(center, nodes, c.edges());
     }
 
     private GraphEdge toGraphEdge(NeighborEdge e) {

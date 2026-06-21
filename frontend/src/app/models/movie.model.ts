@@ -25,6 +25,7 @@ export interface GraphNode {
   title: string;
   year: number | null;
   posterPath: string | null;
+  inScore: number;
 }
 
 export interface GraphEdge {

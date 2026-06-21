@@ -101,7 +101,7 @@ public class MovieQueryRepository {
         return ctx.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.RELEASE_YEAR, MOVIE.POSTER_PATH)
                 .from(MOVIE)
                 .where(MOVIE.MOVIE_ID.in(ids))
-                .fetch(r -> new GraphNode(r.value1(), r.value2(), toInteger(r.value3()), r.value4()));
+                .fetch(r -> new GraphNode(r.value1(), r.value2(), toInteger(r.value3()), r.value4(), 0.0));
     }
 
     private static Integer toInteger(Short s) {

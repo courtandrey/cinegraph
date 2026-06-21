@@ -77,14 +77,7 @@ public final class Graphs {
         return new Component(nodeIdsOf(edges), edges);
     }
 
-    public static long centerId(List<GraphEdge> edges) {
-        return edgeSums(edges).entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(0L);
-    }
-
-    private static Map<Long, Double> edgeSums(List<GraphEdge> edges) {
+    public static Map<Long, Double> edgeSums(List<GraphEdge> edges) {
         Map<Long, Double> sums = new HashMap<>();
         for (GraphEdge e : edges) {
             sums.merge(e.source(), (double) e.score(), Double::sum);

@@ -428,10 +428,9 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
     const scoreByNode = new Map<number, number>();
     if (this.layoutByInScore) {
-      for (const e of edges) {
-        scoreByNode.set(e.source, (scoreByNode.get(e.source) ?? 0) + e.score);
-        scoreByNode.set(e.target, (scoreByNode.get(e.target) ?? 0) + e.score);
-      }
+      // Use the server-precomputed in-score so ring distance matches the in-score the
+      // panel/slider show — not the (filtered) edges still on screen.
+      for (const n of this.graph?.nodes ?? []) scoreByNode.set(n.id, n.inScore ?? 0);
     } else {
       for (const e of edges) {
         if (e.source === cid) scoreByNode.set(e.target, e.score);

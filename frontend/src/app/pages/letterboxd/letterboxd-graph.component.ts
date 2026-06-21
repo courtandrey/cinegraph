@@ -32,10 +32,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     const map = new Map<number, number>();
     const g = this.store.current();
     if (!g) return map;
-    for (const e of g.edges) {
-      map.set(e.source, (map.get(e.source) ?? 0) + e.score);
-      map.set(e.target, (map.get(e.target) ?? 0) + e.score);
-    }
+    for (const n of g.nodes) map.set(n.id, n.inScore);
     return map;
   });
 
