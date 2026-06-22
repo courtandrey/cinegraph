@@ -26,6 +26,14 @@ export class LetterboxdStore {
     this._inScoreThreshold.set(v);
   }
 
+  setIndex(i: number): void {
+    if (i >= 0 && i < this._graphs().length) this._index.set(i);
+  }
+
+  graphIndexOf(movieId: number): number {
+    return this._graphs().findIndex(g => g.nodes.some(n => n.id === movieId));
+  }
+
   next(): void {
     this._index.update(i => Math.min(i + 1, this._graphs().length - 1));
   }

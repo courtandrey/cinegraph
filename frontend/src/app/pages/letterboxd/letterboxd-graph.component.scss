@@ -95,11 +95,48 @@
   font-size: 14px;
 }
 
-.graph-switcher {
+.bottom-controls {
   position: absolute;
+  left: 0;
+  right: 0;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.find-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 43px;
+  height: 43px;
+  background: $accent-green;
+  border: none;
+  border-radius: 50%;
+  color: #071a0d;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover { filter: brightness(1.08); }
+}
+
+.find-spacer {
+  flex: 0 0 auto;
+  width: 46px;
+}
+
+.graph-switcher {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -108,7 +145,6 @@
   border: 1px solid $border;
   border-radius: 999px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-  z-index: 5;
 }
 
 .arrow {

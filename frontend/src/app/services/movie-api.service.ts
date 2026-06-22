@@ -51,6 +51,12 @@ export class MovieApiService {
     return this.http.get<LetterboxdGraph[]>(`${this.base}/letterboxd/${hash}/graphs`);
   }
 
+  letterboxdSearch(hash: string, q: string, limit = 10) {
+    return this.http.get<MovieSummary[]>(`${this.base}/letterboxd/${hash}/search`, {
+      params: { q, limit: limit.toString() }
+    });
+  }
+
   letterboxdRecenter(hash: string, movieId: number, minScore = 12, limit = 40) {
     return this.http.post<GraphPayload>(`${this.base}/letterboxd/recenter`, {
       hash, movieId, minScore, limit

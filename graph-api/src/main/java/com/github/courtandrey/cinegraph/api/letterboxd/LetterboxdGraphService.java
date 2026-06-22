@@ -81,6 +81,10 @@ public class LetterboxdGraphService {
         return assembleGraphs(setRepo.loadMovieIds(hash));
     }
 
+    public List<com.github.courtandrey.cinegraph.api.dto.SearchResult> search(String hash, String q, int limit) {
+        return movieRepo.search(q, limit, setRepo.loadMovieIds(hash));
+    }
+
     public Optional<GraphPayload> recenter(String hash, long movieId, float minScore, int limit) {
         return movieRepo.findById(movieId).map(center -> {
             List<Long> subset = setRepo.loadMovieIds(hash);

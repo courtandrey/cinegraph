@@ -31,14 +31,20 @@ public class MovieQueryRepository {
     }
 
     public List<SearchResult> search(String q, int limit) {
+        return search(q, limit, null);
+    }
+
+    public List<SearchResult> search(String q, int limit, Collection<Long> subset) {
+        if (subset != null && subset.isEmpty()) return List.of();
         Field<String> pattern = inline(q).concat(inline("%"));
         var prefixMatch = Pg.ilike(MOVIE.TITLE, pattern);
+        var textMatch = prefixMatch
+                .or(Pg.wordSimilar(MOVIE.TITLE, q))
+                .or(Pg.wordSimilar(MOVIE.ORIGINAL_TITLE, q));
 
         return ctx.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.RELEASE_YEAR, MOVIE.POSTER_PATH)
                 .from(MOVIE)
-                .where(prefixMatch
-                        .or(Pg.wordSimilar(MOVIE.TITLE, q))
-                        .or(Pg.wordSimilar(MOVIE.ORIGINAL_TITLE, q)))
+                .where(subset == null ? textMatch : textMatch.and(MOVIE.MOVIE_ID.in(subset)))
                 .orderBy(
                         org.jooq.impl.DSL.field(prefixMatch).desc(),
                         Pg.similarity(MOVIE.TITLE, q).desc(),

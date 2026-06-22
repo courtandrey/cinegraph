@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -49,6 +50,16 @@ public class LetterboxdController {
     @GetMapping("/{hash}/graphs")
     public ResponseEntity<?> overview(@PathVariable String hash) {
         return ResponseEntity.ok(service.overview(hash));
+    }
+
+    @GetMapping("/{hash}/search")
+    public ResponseEntity<?> search(@PathVariable String hash,
+                                    @RequestParam String q,
+                                    @RequestParam(defaultValue = "10") int limit) {
+        if (q == null || q.trim().length() < 2) {
+            return ResponseEntity.ok(java.util.List.of());
+        }
+        return ResponseEntity.ok(service.search(hash, q.trim(), Math.min(limit, 50)));
     }
 
     @PostMapping("/recenter")

@@ -22,6 +22,8 @@ const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
 const LARGE_NODE_COUNT = 150;
 const LARGE_EDGE_COUNT = 400;
 
+const FOCUS_ZOOM = 1.8;
+
 @Component({
   selector: 'app-graph-canvas',
   standalone: true,
@@ -37,6 +39,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
   @Input() minScore = 12;
   @Input() selectedNodeId: number | null = null;
   @Input() layoutByInScore = false;
+  @Input() focus: { id: number } | null = null;
 
   @Output() nodeTap = new EventEmitter<number>();
   @Output() clearSelection = new EventEmitter<void>();
@@ -48,6 +51,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
   private cy: Core | null = null;
   private large = false;
+  private pendingFocus: number | null = null;
   private lastLayoutCenter: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private resizeRaf = 0;
@@ -63,10 +67,15 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!this.cy) return;
-    if (changes['graph'] || changes['minScore']) {
+    const rebuilt = !!(changes['graph'] || changes['minScore']);
+    if (rebuilt) {
       this.rebuildGraph();
     } else if (changes['selectedNodeId']) {
       this.applySelection();
+    }
+    if (changes['focus'] && this.focus) {
+      this.pendingFocus = this.focus.id;
+      if (!rebuilt) this.runPendingFocus();
     }
   }
 
@@ -119,8 +128,6 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
         style: this.buildStyle() as any,
         layout: this.buildLayout(true) as any,
         motionBlur: false,
-        // Cap device pixels on big graphs so each pan/zoom frame fills ~4× fewer
-        // pixels on hi-dpi screens. Edges stay drawn every frame (no blanking).
         pixelRatio: this.large ? 1 : 'auto'
       });
 
@@ -221,9 +228,26 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
       const fit = this.lastLayoutCenter !== this.centerId;
       this.lastLayoutCenter = this.centerId;
-      cy.layout(this.buildLayout(fit) as any).run();
+      const layout = cy.layout(this.buildLayout(fit) as any);
+      layout.one('layoutstop', () => this.runPendingFocus());
+      layout.run();
 
       this.applySelection();
+    });
+  }
+
+  private runPendingFocus(): void {
+    const id = this.pendingFocus;
+    if (id == null || !this.cy) return;
+    this.pendingFocus = null;
+    const node = this.cy.$id(String(id));
+    if (!node.length) return;
+    this.ngZone.runOutsideAngular(() => {
+      this.cy!.stop();
+      this.cy!.animate(
+        { center: { eles: node }, zoom: FOCUS_ZOOM },
+        { duration: 450, easing: 'ease-in-out-cubic' }
+      );
     });
   }
 
@@ -324,6 +348,11 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
             const p = ele.data('posterPath') as string | null;
             return p ? `${posterBase}${p}` : 'none';
           },
+          // Load posters without CORS: image.tmdb.org sometimes serves cached responses
+          // missing the ACAO header (poisoned by prior non-CORS <img> loads of the same
+          // file), which blocks crossorigin requests. We never read canvas pixels, so a
+          // tainted canvas is harmless.
+          'background-image-crossorigin': 'null',
           'background-fit': 'cover',
           'background-clip': 'node',
           'border-width': 0,
@@ -362,7 +391,6 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
         selector: 'node.dimmed',
         style: { opacity: 0.2 }
       },
-      // ── edges ──────────────────────────────────────────────────────────────
       {
         selector: 'edge',
         style: {
@@ -428,8 +456,6 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
 
     const scoreByNode = new Map<number, number>();
     if (this.layoutByInScore) {
-      // Use the server-precomputed in-score so ring distance matches the in-score the
-      // panel/slider show — not the (filtered) edges still on screen.
       for (const n of this.graph?.nodes ?? []) scoreByNode.set(n.id, n.inScore ?? 0);
     } else {
       for (const e of edges) {

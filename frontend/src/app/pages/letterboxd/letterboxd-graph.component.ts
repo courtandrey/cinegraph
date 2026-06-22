@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GraphCanvasComponent } from '../graph/graph-canvas/graph-canvas.component';
+import { LetterboxdSearchComponent } from './letterboxd-search/letterboxd-search.component';
 import { LetterboxdStore } from '../../services/letterboxd-store.service';
 import { GraphStore } from '../../services/graph-store.service';
 import { MovieApiService } from '../../services/movie-api.service';
@@ -11,7 +12,7 @@ const POSTER_W342 = 'https://image.tmdb.org/t/p/w342';
 @Component({
   selector: 'app-letterboxd-graph',
   standalone: true,
-  imports: [GraphCanvasComponent],
+  imports: [GraphCanvasComponent, LetterboxdSearchComponent],
   templateUrl: './letterboxd-graph.component.html',
   styleUrl: './letterboxd-graph.component.scss'
 })
@@ -26,6 +27,9 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly selectedDetail = signal<MovieDetail | null>(null);
   readonly status = signal<'loading' | 'ready' | 'error'>('ready');
   readonly thresholdDisplay = signal(this.store.inScoreThreshold());
+  readonly searchOpen = signal(false);
+  readonly forcedNodeId = signal<number | null>(null);
+  readonly focusTarget = signal<{ id: number } | null>(null);
   private thresholdTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly inScoreById = computed(() => {
@@ -47,9 +51,10 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (!g) return null;
     const scores = this.inScoreById();
     const threshold = this.store.inScoreThreshold();
+    const forced = this.forcedNodeId();
 
     const keep = new Set<number>(
-      g.nodes.filter(n => (scores.get(n.id) ?? 0) >= threshold).map(n => n.id)
+      g.nodes.filter(n => (scores.get(n.id) ?? 0) >= threshold || n.id === forced).map(n => n.id)
     );
     const nodes = g.nodes.filter(n => keep.has(n.id));
     if (!nodes.length) return null;
@@ -121,6 +126,25 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (this.thresholdTimer) clearTimeout(this.thresholdTimer);
     this.thresholdDisplay.set(0);
     this.store.setInScoreThreshold(0);
+    this.forcedNodeId.set(null);
+  }
+
+  openSearch(): void {
+    this.searchOpen.set(true);
+  }
+
+  onSearchPick(movieId: number): void {
+    this.searchOpen.set(false);
+    const idx = this.store.graphIndexOf(movieId);
+    if (idx === -1) return;
+
+    if (idx !== this.store.index()) {
+      this.resetThreshold();
+      this.store.setIndex(idx);
+    }
+    this.forcedNodeId.set(movieId);
+    this.onNodeTap(movieId);
+    this.focusTarget.set({ id: movieId });
   }
 
   prev(): void {

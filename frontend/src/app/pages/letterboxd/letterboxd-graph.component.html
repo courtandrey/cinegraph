@@ -1,7 +1,7 @@
 <div class="lbxd-page">
   <div class="toolbar">
     <button class="back-btn" (click)="router.navigate(['/'])">Search</button>
-    <span class="title-hint">Your Letterboxd graph — click a film to inspect it</span>
+    <span class="title-hint">Click a film to inspect it</span>
     <span class="control-group">
       <span class="control-label">MIN IN-SCORE</span>
       <input
@@ -22,6 +22,7 @@
           [centerId]="centerId()"
           [layoutByInScore]="true"
           [selectedNodeId]="selectedNodeId()"
+          [focus]="focusTarget()"
           (nodeTap)="onNodeTap($event)"
           (clearSelection)="onClearSelection()"
         />
@@ -31,11 +32,23 @@
         <div class="empty-state">The graph is loading…</div>
       }
 
-      @if (store.count() > 1) {
-        <div class="graph-switcher">
-          <button class="arrow" (click)="prev()" [disabled]="store.index() === 0" aria-label="Previous graph">←</button>
-          <span class="counter">{{ store.index() + 1 }}/{{ store.count() }}</span>
-          <button class="arrow" (click)="next()" [disabled]="store.index() === store.count() - 1" aria-label="Next graph">→</button>
+      @if (store.count() > 0) {
+        <div class="bottom-controls">
+          <button class="find-btn" (click)="openSearch()" aria-label="Find a film" title="Find a film">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+            </svg>
+          </button>
+          @if (store.count() > 1) {
+            <div class="graph-switcher">
+              <button class="arrow" (click)="prev()" [disabled]="store.index() === 0" aria-label="Previous graph">←</button>
+              <span class="counter">{{ store.index() + 1 }}/{{ store.count() }}</span>
+              <button class="arrow" (click)="next()" [disabled]="store.index() === store.count() - 1" aria-label="Next graph">→</button>
+            </div>
+            <div class="find-spacer" aria-hidden="true"></div>
+          }
         </div>
       }
     </div>
@@ -91,4 +104,8 @@
     </aside>
     }
   </div>
+
+  @if (searchOpen()) {
+    <app-letterboxd-search (pick)="onSearchPick($event)" (closed)="searchOpen.set(false)" />
+  }
 </div>
