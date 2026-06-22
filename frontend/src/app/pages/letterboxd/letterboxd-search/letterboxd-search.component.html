@@ -1,0 +1,50 @@
+<div class="modal-backdrop" (click)="closed.emit()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">Find a film in your graph</span>
+      <button class="modal-close" (click)="closed.emit()" aria-label="Close">✕</button>
+    </div>
+
+    <div class="input-wrapper">
+      <input
+        #box
+        [formControl]="searchControl"
+        placeholder="Search your films…"
+        autocomplete="off"
+        spellcheck="false"
+        class="search-input"
+        (keydown)="onKeydown($event)"
+      />
+      @if (loading()) { <span class="spinner"></span> }
+    </div>
+
+    @if (results().length > 0) {
+      <ul class="results" role="listbox">
+        @for (movie of results(); track movie.id; let i = $index) {
+          <li
+            class="result-item"
+            [class.active]="activeIndex() === i"
+            [class.disabled]="!isConnected(movie)"
+            role="option"
+            (click)="select(movie)"
+          >
+            @if (posterUrl(movie.posterPath); as src) {
+              <img class="thumb" [src]="src" [alt]="movie.title" />
+            } @else {
+              <div class="thumb thumb--empty"></div>
+            }
+            <span class="title">{{ movie.title }}</span>
+            @if (movie.year) { <span class="year">{{ movie.year }}</span> }
+            @if (!isConnected(movie)) {
+              <span class="not-connected">Not connected to any graph</span>
+            }
+          </li>
+        }
+      </ul>
+    } @else if (loading()) {
+      <div class="results-empty">Searching…</div>
+    } @else if ((searchControl.value ?? '').length >= 2) {
+      <div class="results-empty">No films found in your set.</div>
+    }
+  </div>
+</div>
