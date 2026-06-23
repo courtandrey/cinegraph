@@ -54,7 +54,7 @@ public class PathService {
         Long cf = comp.get(from);
         Long ct = comp.get(to);
 
-        if (!Objects.equals(cf, ct)) {
+        if (!Objects.equals(cf, ct) && cf != null && ct != null) {
             return fail("not_connected");
         }
 
