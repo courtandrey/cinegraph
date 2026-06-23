@@ -51,7 +51,7 @@ public final class Graphs {
         return new Component(nodeIdsOf(edges), edges);
     }
 
-    public static Component capEdgesPerNode(Component c, int minPerNode, float minScoreForNonEssentail) {
+    public static Component capEdgesPerNode(Component c, int minPerNode, float minScoreForNonEssential) {
         Map<Long, List<GraphEdge>> byNode = new HashMap<>();
         for (GraphEdge e : c.edges()) {
             byNode.computeIfAbsent(e.source(), k -> new ArrayList<>()).add(e);
@@ -69,7 +69,7 @@ public final class Graphs {
             graphEdgeStream
                     .stream()
                     .skip(minPerNode)
-                    .filter(node -> node.score() > minScoreForNonEssentail)
+                    .filter(node -> node.score() > minScoreForNonEssential)
                     .forEach(kept::add);
         }
         if (kept.size() == c.edges().size()) return c;

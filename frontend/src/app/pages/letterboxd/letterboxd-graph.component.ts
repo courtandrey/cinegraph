@@ -133,15 +133,36 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.searchOpen.set(true);
   }
 
-  onSearchPick(movieId: number): void {
+  onSearchPick(sel: { movieId: number; graphId: number }): void {
     this.searchOpen.set(false);
-    const idx = this.store.graphIndexOf(movieId);
+    const idx = this.store.graphIndexByCenter(sel.graphId);
     if (idx === -1) return;
 
     if (idx !== this.store.index()) {
       this.resetThreshold();
       this.store.setIndex(idx);
     }
+
+    const g = this.store.current();
+    if (!g) return;
+
+    if (g.nodes.some(n => n.id === sel.movieId)) {
+      this.revealAndFocus(sel.movieId);
+      return;
+    }
+
+    const hash = this.store.hash();
+    if (!hash) return;
+    this.api.letterboxdAttach(hash, sel.movieId, g.nodes.map(n => n.id)).subscribe({
+      next: att => {
+        this.store.mergeIntoCurrent(att.node, att.edges);
+        this.revealAndFocus(sel.movieId);
+      },
+      error: () => this.revealAndFocus(sel.movieId)
+    });
+  }
+
+  private revealAndFocus(movieId: number): void {
     this.forcedNodeId.set(movieId);
     this.onNodeTap(movieId);
     this.focusTarget.set({ id: movieId });

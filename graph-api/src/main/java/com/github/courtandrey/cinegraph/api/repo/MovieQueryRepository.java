@@ -1,6 +1,7 @@
 package com.github.courtandrey.cinegraph.api.repo;
 
 import com.github.courtandrey.cinegraph.api.dto.GraphNode;
+import com.github.courtandrey.cinegraph.api.dto.LetterboxdSearchResult;
 import com.github.courtandrey.cinegraph.api.dto.MovieDetail;
 import com.github.courtandrey.cinegraph.api.dto.SearchResult;
 import org.jooq.DSLContext;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.GENRE;
+import static com.github.courtandrey.cinegraph.api.jooq.Tables.LETTERBOXD_SET;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.MOVIE;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.MOVIE_GENRE;
 import static org.jooq.impl.DSL.inline;
@@ -55,6 +57,31 @@ public class MovieQueryRepository {
                         r.value2(),
                         toInteger(r.value3()),
                         r.value4()));
+    }
+
+    public List<LetterboxdSearchResult> searchInSet(String q, int limit, String hash) {
+        Field<String> pattern = inline(q).concat(inline("%"));
+        var prefixMatch = Pg.ilike(MOVIE.TITLE, pattern);
+        var textMatch = prefixMatch
+                .or(Pg.wordSimilar(MOVIE.TITLE, q))
+                .or(Pg.wordSimilar(MOVIE.ORIGINAL_TITLE, q));
+
+        return ctx.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.RELEASE_YEAR,
+                        MOVIE.POSTER_PATH, LETTERBOXD_SET.GRAPH_ID)
+                .from(MOVIE)
+                .join(LETTERBOXD_SET).on(LETTERBOXD_SET.MOVIE_ID.eq(MOVIE.MOVIE_ID))
+                .where(LETTERBOXD_SET.HASH.eq(hash).and(textMatch))
+                .orderBy(
+                        org.jooq.impl.DSL.field(prefixMatch).desc(),
+                        Pg.similarity(MOVIE.TITLE, q).desc(),
+                        MOVIE.POPULARITY.desc().nullsLast())
+                .limit(Math.min(limit, MAX_SEARCH))
+                .fetch(r -> new LetterboxdSearchResult(
+                        r.value1(),
+                        r.value2(),
+                        toInteger(r.value3()),
+                        r.value4(),
+                        r.value5()));
     }
 
     public Optional<MovieDetail> findById(long id) {

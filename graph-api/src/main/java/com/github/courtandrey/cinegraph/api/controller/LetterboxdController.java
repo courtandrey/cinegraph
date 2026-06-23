@@ -34,6 +34,8 @@ public class LetterboxdController {
     public record ReweightRequest(String hash, Long movieId, Integer limit,
                                   Map<String, Double> weights, Float minScore) {}
 
+    public record AttachRequest(String hash, Long movieId, java.util.List<Long> nodeIds) {}
+
     @PostMapping(value = "/graphs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> graphs(@RequestPart("file") MultipartFile file) {
         byte[] bytes = file == null || file.isEmpty()
@@ -60,6 +62,17 @@ public class LetterboxdController {
             return ResponseEntity.ok(java.util.List.of());
         }
         return ResponseEntity.ok(service.search(hash, q.trim(), Math.min(limit, 50)));
+    }
+
+    @PostMapping("/attach")
+    public ResponseEntity<?> attach(@RequestBody AttachRequest req) {
+        if (req.hash() == null || req.movieId() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "hash and movieId required"));
+        }
+        java.util.List<Long> nodeIds = req.nodeIds() == null ? java.util.List.of() : req.nodeIds();
+        return service.attachNode(req.hash(), req.movieId(), nodeIds)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> notFound(req.movieId()));
     }
 
     @PostMapping("/recenter")

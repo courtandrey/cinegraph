@@ -58,6 +58,19 @@ export interface LetterboxdUploadResponse {
   graphs: LetterboxdGraph[];
 }
 
+export interface LetterboxdSearchResult {
+  id: number;
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+  graphId: number | null;
+}
+
+export interface LetterboxdAttachment {
+  node: GraphNode;
+  edges: GraphEdge[];
+}
+
 export interface EdgeComponent {
   type: 'SHARED_PERSON' | 'SHARED_GENRES' | 'SHARED_KEYWORDS' | 'RELEASE_PROXIMITY';
   score: number;

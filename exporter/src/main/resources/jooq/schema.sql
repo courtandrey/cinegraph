@@ -133,5 +133,6 @@ CREATE TABLE letterboxd_set (
     hash     VARCHAR NOT NULL,
     movie_id BIGINT NOT NULL,
     rating   REAL,
+    graph_id BIGINT,
     PRIMARY KEY (hash, movie_id)
 );

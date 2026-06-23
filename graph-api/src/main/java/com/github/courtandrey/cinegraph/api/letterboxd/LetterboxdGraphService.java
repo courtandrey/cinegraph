@@ -4,11 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.courtandrey.cinegraph.api.config.GraphScoringProperties;
 import com.github.courtandrey.cinegraph.api.config.LetterboxdProperties;
-import com.github.courtandrey.cinegraph.api.dto.GraphEdge;
-import com.github.courtandrey.cinegraph.api.dto.GraphNode;
-import com.github.courtandrey.cinegraph.api.dto.GraphPayload;
-import com.github.courtandrey.cinegraph.api.dto.LetterboxdGraph;
-import com.github.courtandrey.cinegraph.api.dto.LetterboxdUploadResponse;
+import com.github.courtandrey.cinegraph.api.dto.*;
 import com.github.courtandrey.cinegraph.api.letterboxd.LetterboxdCsv.FilmRow;
 import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository;
 import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository.NeighborEdge;
@@ -74,15 +70,42 @@ public class LetterboxdGraphService {
         List<Long> movieIds = setRepo.exists(hash)
                 ? setRepo.loadMovieIds(hash)
                 : resolveAndStore(hash, csv);
-        return new LetterboxdUploadResponse(hash, assembleGraphs(movieIds));
+        Assembled a = assemble(movieIds);
+        bakeGraphIdsIfMissing(hash, a);
+        return new LetterboxdUploadResponse(hash, a.graphs());
     }
 
     public List<LetterboxdGraph> overview(String hash) {
-        return assembleGraphs(setRepo.loadMovieIds(hash));
+        Assembled a = assemble(setRepo.loadMovieIds(hash));
+        bakeGraphIdsIfMissing(hash, a);
+        return a.graphs();
     }
 
-    public List<com.github.courtandrey.cinegraph.api.dto.SearchResult> search(String hash, String q, int limit) {
-        return movieRepo.search(q, limit, setRepo.loadMovieIds(hash));
+    public List<LetterboxdSearchResult> search(String hash, String q, int limit) {
+        return movieRepo.searchInSet(q, limit, hash);
+    }
+
+    public Optional<LetterboxdAttachment> attachNode(
+            String hash, long movieId, java.util.Collection<Long> visibleIds) {
+        List<Long> subset = setRepo.loadMovieIds(hash);
+        if (subset.isEmpty()) return Optional.empty();
+
+        List<NeighborEdge> incident =
+                edgeRepo.findNeighborEdgesAmong(movieId, subset, 0f, scoringProps.getMaxEdgeCandidates());
+        return movieRepo.findNodesByIds(List.of(movieId)).stream().findFirst().map(base -> {
+            double inScore = incident.stream().mapToDouble(NeighborEdge::score).sum();
+            Set<Long> visible = new HashSet<>(visibleIds);
+            List<GraphEdge> edges = incident.stream()
+                    .filter(e -> visible.contains(e.neighborId()))
+                    .map(this::toGraphEdge)
+                    .toList();
+            return new LetterboxdAttachment(
+                    base.withInScore(inScore), edges);
+        });
+    }
+
+    private void bakeGraphIdsIfMissing(String hash, Assembled a) {
+        if (!setRepo.graphIdBaked(hash)) setRepo.updateGraphIds(hash, a.graphIdByMovie());
     }
 
     public Optional<GraphPayload> recenter(String hash, long movieId, float minScore, int limit) {
@@ -191,46 +214,51 @@ public class LetterboxdGraphService {
                 });
     }
 
-    private List<LetterboxdGraph> assembleGraphs(List<Long> movieIds) {
+    private Assembled assemble(List<Long> movieIds) {
         List<GraphEdge> edges = edgeRepo.findEdgesAmong(movieIds).stream()
                 .map(this::toGraphEdge)
                 .toList();
 
         List<Built> built = new ArrayList<>();
+        Map<Long, Long> graphIdByMovie = new HashMap<>();
         for (Graphs.Component comp : Graphs.components(edges)) {
             Graphs.Component withNodes = Graphs.capNodes(comp, props.getMaxGraphNodes());
             Map<Long, Double> inScore = Graphs.edgeSums(withNodes.edges());
             Graphs.Component view = Graphs.capEdgesPerNode(
                     withNodes, props.getMinEdgesPerNode(), props.getMinScoreForNonEssential());
             if (view.nodeIds().size() >= props.getMinGraphNodes()) {
-                built.add(new Built(view, inScore));
+                long centerId = inScore.entrySet().stream()
+                        .max(Map.Entry.comparingByValue())
+                        .map(Map.Entry::getKey)
+                        .orElse(0L);
+                built.add(new Built(view, inScore, centerId));
+                comp.nodeIds().forEach(m -> graphIdByMovie.put(m, centerId));
             }
         }
+        movieIds.forEach(m -> graphIdByMovie.putIfAbsent(m, 0L));
 
         List<Long> ids = built.stream().flatMap(b -> b.view().nodeIds().stream()).distinct().toList();
         Map<Long, GraphNode> nodeById = movieRepo.findNodesByIds(ids).stream()
                 .collect(Collectors.toMap(GraphNode::id, Function.identity()));
 
-        return built.stream()
-                .map(b -> toGraph(b.view(), b.inScore(), nodeById))
+        List<LetterboxdGraph> graphs = built.stream()
+                .map(b -> toGraph(b, nodeById))
                 .sorted(Comparator.comparingInt((LetterboxdGraph g) -> g.nodes().size()).reversed())
                 .toList();
+        return new Assembled(graphs, graphIdByMovie);
     }
 
-    private record Built(Graphs.Component view, Map<Long, Double> inScore) {}
+    private record Assembled(List<LetterboxdGraph> graphs, Map<Long, Long> graphIdByMovie) {}
 
-    private LetterboxdGraph toGraph(Graphs.Component c, Map<Long, Double> inScore,
-                                    Map<Long, GraphNode> nodeById) {
-        List<GraphNode> nodes = c.nodeIds().stream()
+    private record Built(Graphs.Component view, Map<Long, Double> inScore, long centerId) {}
+
+    private LetterboxdGraph toGraph(Built b, Map<Long, GraphNode> nodeById) {
+        List<GraphNode> nodes = b.view().nodeIds().stream()
                 .map(nodeById::get)
                 .filter(Objects::nonNull)
-                .map(n -> n.withInScore(inScore.getOrDefault(n.id(), 0.0)))
+                .map(n -> n.withInScore(b.inScore().getOrDefault(n.id(), 0.0)))
                 .toList();
-        long center = inScore.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(0L);
-        return new LetterboxdGraph(center, nodes, c.edges());
+        return new LetterboxdGraph(b.centerId(), nodes, b.view().edges());
     }
 
     private GraphEdge toGraphEdge(NeighborEdge e) {

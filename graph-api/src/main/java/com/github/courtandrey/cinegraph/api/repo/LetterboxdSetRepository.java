@@ -4,6 +4,7 @@ import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.LETTERBOXD_SET;
 import static org.jooq.impl.DSL.selectOne;
@@ -42,4 +43,20 @@ public class LetterboxdSetRepository {
                 m.rating() == null ? null : m.rating().floatValue()));
         batch.execute();
     }
+
+    public boolean graphIdBaked(String hash) {
+        return ctx.fetchExists(selectOne().from(LETTERBOXD_SET)
+                .where(LETTERBOXD_SET.HASH.eq(hash).and(LETTERBOXD_SET.GRAPH_ID.isNotNull())));
+    }
+
+    public void updateGraphIds(String hash, Map<Long, Long> graphIdByMovie) {
+        if (graphIdByMovie.isEmpty()) return;
+        var update = ctx.update(LETTERBOXD_SET)
+                .set(LETTERBOXD_SET.GRAPH_ID, (Long) null)
+                .where(LETTERBOXD_SET.HASH.eq("").and(LETTERBOXD_SET.MOVIE_ID.eq(0L)));
+        var batch = ctx.batch(update);
+        graphIdByMovie.forEach((movieId, graphId) -> batch.bind(graphId, hash, movieId));
+        batch.execute();
+    }
 }
+

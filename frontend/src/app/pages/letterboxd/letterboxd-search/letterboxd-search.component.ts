@@ -5,14 +5,10 @@ import { catchError, debounceTime, switchMap, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { MovieApiService } from '../../../services/movie-api.service';
 import { LetterboxdStore } from '../../../services/letterboxd-store.service';
-import { MovieSummary } from '../../../models/movie.model';
+import { LetterboxdSearchResult } from '../../../models/movie.model';
 
 const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
 
-/**
- * Modal typeahead over the uploaded film set. Films present in some graph component
- * are selectable; films in the set but connected to nothing are shown disabled.
- */
 @Component({
   selector: 'app-letterboxd-search',
   standalone: true,
@@ -25,23 +21,16 @@ export class LetterboxdSearchComponent {
   private store = inject(LetterboxdStore);
   private destroyRef = inject(DestroyRef);
 
-  @Output() pick = new EventEmitter<number>();
+  @Output() pick = new EventEmitter<{ movieId: number; graphId: number }>();
   @Output() closed = new EventEmitter<void>();
 
   readonly searchControl = new FormControl('');
-  readonly results = signal<MovieSummary[]>([]);
+  readonly results = signal<LetterboxdSearchResult[]>([]);
   readonly loading = signal(false);
   readonly activeIndex = signal(-1);
 
-  // Every node id across all graph components — anything else is "not connected".
-  private readonly connectedIds = new Set<number>(
-    this.store.graphs().flatMap(g => g.nodes.map(n => n.id))
-  );
-
   constructor() {
     this.searchControl.valueChanges.pipe(
-      // Enter the loading state immediately (before the debounce) so the "no films"
-      // message never flashes while a search is pending.
       tap(v => {
         if (v && v.length >= 2) {
           this.loading.set(true);
@@ -53,8 +42,8 @@ export class LetterboxdSearchComponent {
       debounceTime(250),
       switchMap(v => {
         const hash = this.store.hash();
-        if (!hash || !v || v.length < 2) return of<MovieSummary[]>([]);
-        return this.api.letterboxdSearch(hash, v).pipe(catchError(() => of<MovieSummary[]>([])));
+        if (!hash || !v || v.length < 2) return of<LetterboxdSearchResult[]>([]);
+        return this.api.letterboxdSearch(hash, v).pipe(catchError(() => of<LetterboxdSearchResult[]>([])));
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(results => {
@@ -64,16 +53,16 @@ export class LetterboxdSearchComponent {
     });
   }
 
-  isConnected(movie: MovieSummary): boolean {
-    return this.connectedIds.has(movie.id);
+  isConnected(movie: LetterboxdSearchResult): boolean {
+    return movie.graphId != null && movie.graphId !== 0;
   }
 
   posterUrl(path: string | null): string | null {
     return path ? `${POSTER_W92}${path}` : null;
   }
 
-  select(movie: MovieSummary): void {
-    if (this.isConnected(movie)) this.pick.emit(movie.id);
+  select(movie: LetterboxdSearchResult): void {
+    if (this.isConnected(movie)) this.pick.emit({ movieId: movie.id, graphId: movie.graphId! });
   }
 
   onKeydown(event: KeyboardEvent): void {

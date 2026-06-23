@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { LetterboxdGraph } from '../models/movie.model';
+import { LetterboxdGraph, GraphNode, GraphEdge } from '../models/movie.model';
 
 @Injectable({ providedIn: 'root' })
 export class LetterboxdStore {
@@ -32,6 +32,25 @@ export class LetterboxdStore {
 
   graphIndexOf(movieId: number): number {
     return this._graphs().findIndex(g => g.nodes.some(n => n.id === movieId));
+  }
+
+  graphIndexByCenter(centerId: number): number {
+    return this._graphs().findIndex(g => g.centerId === centerId);
+  }
+
+  mergeIntoCurrent(node: GraphNode, edges: GraphEdge[]): void {
+    this._graphs.update(graphs => {
+      const i = this._index();
+      const g = graphs[i];
+      if (!g) return graphs;
+      const nodes = g.nodes.some(n => n.id === node.id) ? g.nodes : [...g.nodes, node];
+      const seen = new Set(g.edges.map(e => `${e.source}-${e.target}`));
+      const added = edges.filter(e =>
+        !seen.has(`${e.source}-${e.target}`) && !seen.has(`${e.target}-${e.source}`));
+      const next = [...graphs];
+      next[i] = { ...g, nodes, edges: [...g.edges, ...added] };
+      return next;
+    });
   }
 
   next(): void {
