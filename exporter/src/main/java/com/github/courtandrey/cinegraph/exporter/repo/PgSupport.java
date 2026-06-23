@@ -30,4 +30,21 @@ public final class PgSupport {
     public static void analyze(DSLContext ctx, Table<?> table) {
         ctx.execute("ANALYZE " + table.getName());
     }
+
+    public static int propagateComponents(DSLContext ctx) {
+        return ctx.execute("""
+                WITH nbr AS (
+                    SELECT e.movie_a AS node, m2.component_id AS lbl
+                      FROM edge e JOIN movie m2 ON m2.movie_id = e.movie_b
+                    UNION ALL
+                    SELECT e.movie_b AS node, m1.component_id AS lbl
+                      FROM edge e JOIN movie m1 ON m1.movie_id = e.movie_a
+                ),
+                best AS (SELECT node, MIN(lbl) AS lbl FROM nbr GROUP BY node)
+                UPDATE movie m SET component_id = best.lbl
+                  FROM best
+                 WHERE m.movie_id = best.node AND best.lbl < m.component_id
+                """);
+    }
+
 }

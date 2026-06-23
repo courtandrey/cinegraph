@@ -1,0 +1,61 @@
+<div class="modal-backdrop" (click)="closed.emit()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">Shortest path from {{ fromTitle }}</span>
+      <button class="modal-close" (click)="closed.emit()" aria-label="Close">✕</button>
+    </div>
+
+    <div class="input-wrapper">
+      <input
+        [formControl]="searchControl"
+        placeholder="Search the destination film…"
+        autocomplete="off"
+        spellcheck="false"
+        class="search-input"
+      />
+      @if (searching()) { <span class="spinner"></span> }
+    </div>
+
+    @if (results().length > 0) {
+      <ul class="results" role="listbox">
+        @for (movie of results(); track movie.id) {
+          <li class="result-item" (click)="pickTarget(movie)">
+            @if (posterUrl(movie.posterPath); as src) {
+              <img class="thumb" [src]="src" [alt]="movie.title" />
+            } @else {
+              <div class="thumb thumb--empty"></div>
+            }
+            <span class="title">{{ movie.title }}</span>
+            @if (movie.year) { <span class="year">{{ movie.year }}</span> }
+          </li>
+        }
+      </ul>
+    }
+
+    @if (computing()) {
+      <div class="status">Finding shortest path…</div>
+    }
+    @if (!computing() && result(); as r) {
+      @if (r.found) {
+        <div class="path-summary">{{ r.hops }} hop{{ r.hops === 1 ? '' : 's' }}</div>
+        <ol class="chain">
+          @for (node of r.nodes; track node.id; let i = $index) {
+            <li class="chain-node" (click)="openFilm(node.id)">
+              @if (posterUrl(node.posterPath); as src) {
+                <img class="chain-thumb" [src]="src" [alt]="node.title" />
+              } @else {
+                <div class="chain-thumb thumb--empty"></div>
+              }
+              <span class="chain-title">{{ node.title }}@if (node.year) { <span class="chain-year">{{ node.year }}</span> }</span>
+            </li>
+            @if (i < r.edges.length) {
+              <li class="chain-link">↓ {{ r.edges[i].topReason }}</li>
+            }
+          }
+        </ol>
+      } @else {
+        <div class="status">{{ reasonText(r.reason) }}</div>
+      }
+    }
+  </div>
+</div>

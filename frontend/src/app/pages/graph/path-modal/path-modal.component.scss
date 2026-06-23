@@ -1,0 +1,186 @@
+@use '../../../../styles/tokens' as *;
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh 16px 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: $panel;
+  border: 1px solid $border;
+  border-radius: 6px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid $border;
+}
+
+.modal-title {
+  color: $heading;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: $text;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-family: inherit;
+
+  &:hover { color: $text-bright; }
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 12px 14px 6px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 36px 10px 12px;
+  background: $panel-2;
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $text-bright;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+
+  &::placeholder { color: $text; opacity: 0.6; }
+  &:focus { border-color: $accent-green; }
+}
+
+.spinner {
+  position: absolute;
+  right: 26px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid $border;
+  border-top-color: $accent-green;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+
+  &:hover { background: $panel-2; }
+}
+
+.thumb {
+  width: 32px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+
+  &--empty { background: $panel-2; }
+}
+
+.title {
+  flex: 1;
+  color: $text-bright;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.year { color: $text; font-size: 12px; flex-shrink: 0; }
+
+.status {
+  padding: 16px 14px;
+  color: $text;
+  font-size: 14px;
+}
+
+.path-summary {
+  padding: 10px 14px 4px;
+  color: $accent-green;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chain {
+  list-style: none;
+  margin: 0;
+  padding: 6px 14px 16px;
+  overflow-y: auto;
+}
+
+.chain-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px;
+  border-radius: 3px;
+  cursor: pointer;
+
+  &:hover { background: $panel-2; }
+}
+
+.chain-thumb {
+  width: 38px;
+  height: 57px;
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.chain-title {
+  color: $text-bright;
+  font-size: 14px;
+}
+
+.chain-year {
+  color: $text;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.chain-link {
+  color: $text;
+  font-size: 12px;
+  padding: 4px 0 4px 50px;
+}

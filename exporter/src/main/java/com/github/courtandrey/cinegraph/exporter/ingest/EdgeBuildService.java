@@ -78,13 +78,16 @@ public class EdgeBuildService {
     private final LoadRunRepository runRepo;
     private final RunRegistry runRegistry;
     private final ScoringProperties scoring;
+    private final ComponentBuildService componentBuild;
 
     public EdgeBuildService(DSLContext ctx, LoadRunRepository runRepo,
-                            RunRegistry runRegistry, ScoringProperties scoring) {
+                            RunRegistry runRegistry, ScoringProperties scoring,
+                            ComponentBuildService componentBuild) {
         this.ctx = ctx;
         this.runRepo = runRepo;
         this.runRegistry = runRegistry;
         this.scoring = scoring;
+        this.componentBuild = componentBuild;
     }
 
     public long triggerFullRebuild() {
@@ -146,6 +149,10 @@ public class EdgeBuildService {
             cleanUpAfterEdgeCrewBuild();
             runRepo.updateStats(runId, stats.phaseJson("edgeCrewMerged", 1, 1));
             stats = runPass2(runId, incremental, cancelKey, stats);
+
+            if (!incremental && !cancelled(cancelKey)) {
+                componentBuild.recompute();
+            }
 
             runRepo.finish(runId, RunStatus.COMPLETED, stats.toJson());
             if (incremental) {

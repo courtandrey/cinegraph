@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { GraphCanvasComponent } from './graph-canvas/graph-canvas.component';
 import { FilmPanelComponent } from './film-panel/film-panel.component';
 import { WeightsPanelComponent, RoleSlider } from './weights-panel/weights-panel.component';
+import { PathModalComponent } from './path-modal/path-modal.component';
 import { MovieApiService } from '../../services/movie-api.service';
 import { GraphStore } from '../../services/graph-store.service';
 import { crewScoreOf, rolesInGraph, COMPONENT_DEFAULTS } from '../../services/graph-scoring';
@@ -12,7 +13,7 @@ import { GraphPayload, GraphNode, MovieDetail, EdgeBreakdown, RoleWeight } from 
 @Component({
   selector: 'app-graph',
   standalone: true,
-  imports: [GraphCanvasComponent, FilmPanelComponent, WeightsPanelComponent],
+  imports: [GraphCanvasComponent, FilmPanelComponent, WeightsPanelComponent, PathModalComponent],
   templateUrl: './graph.component.html',
   styleUrl: './graph.component.scss'
 })
@@ -31,6 +32,7 @@ export class GraphComponent implements OnInit, OnDestroy {
   readonly selectedBreakdown = signal<EdgeBreakdown | null>(null);
   readonly weightsOpen = signal(false);
   readonly infoOpen = signal(false);
+  readonly pathOpen = signal(false);
   readonly defaultWeights = signal<ReadonlyMap<string, number>>(new Map());
   readonly minScoreDisplay = signal(this.store.minScore());
   private minScoreTimer: ReturnType<typeof setTimeout> | null = null;

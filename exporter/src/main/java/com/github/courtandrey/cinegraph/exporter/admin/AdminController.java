@@ -2,6 +2,7 @@ package com.github.courtandrey.cinegraph.exporter.admin;
 
 import com.github.courtandrey.cinegraph.exporter.domain.RunKind;
 import com.github.courtandrey.cinegraph.exporter.domain.RunStatus;
+import com.github.courtandrey.cinegraph.exporter.ingest.ComponentBuildService;
 import com.github.courtandrey.cinegraph.exporter.ingest.EdgeBuildService;
 import com.github.courtandrey.cinegraph.exporter.ingest.FullLoadService;
 import com.github.courtandrey.cinegraph.exporter.ingest.IncrementalLoadService;
@@ -41,6 +42,7 @@ public class AdminController {
     private final FullLoadService fullLoadService;
     private final IncrementalLoadService incrementalLoadService;
     private final EdgeBuildService edgeBuildService;
+    private final ComponentBuildService componentBuildService;
     private final ReprojectService reprojectService;
     private final LoadRunRepository runRepo;
     private final FetchQueueRepository queueRepo;
@@ -49,6 +51,7 @@ public class AdminController {
     public AdminController(FullLoadService fullLoadService,
                            IncrementalLoadService incrementalLoadService,
                            EdgeBuildService edgeBuildService,
+                           ComponentBuildService componentBuildService,
                            ReprojectService reprojectService,
                            LoadRunRepository runRepo,
                            FetchQueueRepository queueRepo,
@@ -56,6 +59,7 @@ public class AdminController {
         this.fullLoadService = fullLoadService;
         this.incrementalLoadService = incrementalLoadService;
         this.edgeBuildService = edgeBuildService;
+        this.componentBuildService = componentBuildService;
         this.reprojectService = reprojectService;
         this.runRepo = runRepo;
         this.queueRepo = queueRepo;
@@ -95,6 +99,14 @@ public class AdminController {
                     .body(Map.of("error", "ingestRunId query parameter is required"));
         }
         return accept(() -> edgeBuildService.triggerIncrementalEdges(ingestRunId), RunKind.EDGE_INCREMENTAL);
+    }
+
+    /** Recompute movie.component_id without a full edge rebuild (backfill / after migration). */
+    @PostMapping("/edges/components")
+    public ResponseEntity<Map<String, Object>> recomputeComponents() {
+        Thread.ofPlatform().name("component-build").start(() ->
+                Try.run(componentBuildService::recompute));
+        return ResponseEntity.accepted().body(Map.of("status", "components recompute started"));
     }
 
     @GetMapping("/runs/{id}")

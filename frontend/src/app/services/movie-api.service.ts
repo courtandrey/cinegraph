@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MovieSummary, MovieDetail, GraphPayload, EdgeBreakdown, RoleWeight, LetterboxdGraph, LetterboxdUploadResponse, LetterboxdSearchResult, LetterboxdAttachment } from '../models/movie.model';
+import { MovieSummary, MovieDetail, GraphPayload, EdgeBreakdown, RoleWeight, LetterboxdGraph, LetterboxdUploadResponse, LetterboxdSearchResult, LetterboxdAttachment, PathResult } from '../models/movie.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -39,6 +39,10 @@ export class MovieApiService {
   getEdge(a: number, b: number) {
     const [lo, hi] = a < b ? [a, b] : [b, a];
     return this.http.get<EdgeBreakdown>(`${this.base}/edges/${lo}/${hi}`);
+  }
+
+  findPath(from: number, to: number) {
+    return this.http.get<PathResult>(`${this.base}/movies/${from}/path/${to}`);
   }
 
   uploadLetterboxd(file: File) {

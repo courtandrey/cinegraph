@@ -71,6 +71,14 @@ export interface LetterboxdAttachment {
   edges: GraphEdge[];
 }
 
+export interface PathResult {
+  found: boolean;
+  reason: string | null;
+  hops: number;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
 export interface EdgeComponent {
   type: 'SHARED_PERSON' | 'SHARED_GENRES' | 'SHARED_KEYWORDS' | 'RELEASE_PROXIMITY';
   score: number;

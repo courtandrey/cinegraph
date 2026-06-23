@@ -7,6 +7,9 @@
           <button class="back-btn" (click)="goBack()">← Back</button>
         }
         <button class="back-btn" (click)="exit()">{{ hash() ? 'My graph' : 'Search' }}</button>
+        @if (!hash()) {
+          <button class="back-btn" (click)="pathOpen.set(true)">Path to…</button>
+        }
       </div>
       <div class="controls">
         <span class="control-group">
@@ -88,4 +91,8 @@
       (adjustWeights)="onAdjustWeights()"
     />
   </aside>
+
+  @if (pathOpen() && graph(); as g) {
+    <app-path-modal [fromId]="centerId()" [fromTitle]="g.center.title" (closed)="pathOpen.set(false)" />
+  }
 </div>
