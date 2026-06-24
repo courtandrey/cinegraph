@@ -10,6 +10,7 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    shm_size: 1gb
     command: >
       postgres -c shared_buffers=1GB -c work_mem=64MB
                -c maintenance_work_mem=512MB -c max_wal_size=4GB
