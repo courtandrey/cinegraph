@@ -9,7 +9,6 @@ import { MovieSummary, PathResult } from '../../../models/movie.model';
 
 const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
 
-/** Picks a destination film and shows the shortest path (fewest hops) to it. */
 @Component({
   selector: 'app-path-modal',
   standalone: true,
@@ -48,6 +47,16 @@ export class PathModalComponent {
       this.results.set(r.filter(m => m.id !== this.fromId));
       this.searching.set(false);
     });
+  }
+
+  private pressedOnBackdrop = false;
+
+  onBackdropMouseDown(e: MouseEvent): void {
+    this.pressedOnBackdrop = e.target === e.currentTarget;
+  }
+
+  onBackdropClick(e: MouseEvent): void {
+    if (this.pressedOnBackdrop && e.target === e.currentTarget) this.closed.emit();
   }
 
   posterUrl(path: string | null): string | null {

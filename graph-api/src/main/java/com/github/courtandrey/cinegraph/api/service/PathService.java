@@ -28,7 +28,7 @@ public class PathService {
 
     private static final int MAX_HOPS = 12;
     private static final int MAX_SETTLED = 800_000;
-    private static final long BUDGET_MS = 20_000;
+    private static final long BUDGET_MS = 60_000;
 
     private final PathQueryRepository pathRepo;
     private final MovieQueryRepository movieRepo;

@@ -53,6 +53,16 @@ export class LetterboxdSearchComponent {
     });
   }
 
+  private pressedOnBackdrop = false;
+
+  onBackdropMouseDown(e: MouseEvent): void {
+    this.pressedOnBackdrop = e.target === e.currentTarget;
+  }
+
+  onBackdropClick(e: MouseEvent): void {
+    if (this.pressedOnBackdrop && e.target === e.currentTarget) this.closed.emit();
+  }
+
   isConnected(movie: LetterboxdSearchResult): boolean {
     return movie.graphId != null && movie.graphId !== 0;
   }

@@ -1,4 +1,4 @@
-<div class="modal-backdrop" (click)="closed.emit()">
+<div class="modal-backdrop" (mousedown)="onBackdropMouseDown($event)" (click)="onBackdropClick($event)">
   <div class="modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <span class="modal-title">Find a film in your graph</span>
