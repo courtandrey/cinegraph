@@ -11,6 +11,22 @@ public final class PgSupport {
 
     private PgSupport() {}
 
+    public static void computeDegrees(DSLContext ctx) {
+        ctx.execute("""
+                UPDATE movie m SET degree = COALESCE(c.cnt, 0)
+                FROM (
+                    SELECT mv.movie_id AS id, agg.cnt
+                    FROM movie mv
+                    LEFT JOIN (
+                        SELECT node, count(*) AS cnt
+                        FROM (SELECT movie_a AS node FROM edge UNION ALL SELECT movie_b FROM edge) e
+                        GROUP BY node
+                    ) agg ON agg.node = mv.movie_id
+                ) c
+                WHERE m.movie_id = c.id
+                """);
+    }
+
     public static Field<JSONB> jsonbConcat(Field<JSONB> first, Field<JSONB>... rest) {
         Field<JSONB> acc = first;
         for (Field<JSONB> f : rest) {
@@ -29,22 +45,6 @@ public final class PgSupport {
 
     public static void analyze(DSLContext ctx, Table<?> table) {
         ctx.execute("ANALYZE " + table.getName());
-    }
-
-    public static int propagateComponents(DSLContext ctx) {
-        return ctx.execute("""
-                WITH nbr AS (
-                    SELECT e.movie_a AS node, m2.component_id AS lbl
-                      FROM edge e JOIN movie m2 ON m2.movie_id = e.movie_b
-                    UNION ALL
-                    SELECT e.movie_b AS node, m1.component_id AS lbl
-                      FROM edge e JOIN movie m1 ON m1.movie_id = e.movie_a
-                ),
-                best AS (SELECT node, MIN(lbl) AS lbl FROM nbr GROUP BY node)
-                UPDATE movie m SET component_id = best.lbl
-                  FROM best
-                 WHERE m.movie_id = best.node AND best.lbl < m.component_id
-                """);
     }
 
 }

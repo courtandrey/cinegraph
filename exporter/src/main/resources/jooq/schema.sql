@@ -37,7 +37,7 @@ CREATE TABLE movie (
     overview          VARCHAR,
     countries         VARCHAR(255) ARRAY NOT NULL,
     updated_at        TIMESTAMPTZ NOT NULL,
-    component_id      BIGINT
+    degree            INTEGER
 );
 
 CREATE TABLE genre (

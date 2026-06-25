@@ -8,7 +8,6 @@ import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository;
 import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository.NeighborEdge;
 import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository;
 import com.github.courtandrey.cinegraph.api.service.GraphScoring;
-import com.github.courtandrey.cinegraph.api.service.PathService;
 import com.github.courtandrey.cinegraph.api.service.TopReasonResolver;
 import io.vavr.control.Try;
 import org.springframework.http.ResponseEntity;
@@ -30,19 +29,17 @@ public class MovieController {
     private final TopReasonResolver    topReason;
     private final GraphScoring         graphScoring;
     private final GraphScoringProperties scoringProps;
-    private final PathService          pathService;
     private final ObjectMapper         mapper;
 
     public MovieController(MovieQueryRepository movieRepo, EdgeQueryRepository edgeRepo,
                            TopReasonResolver topReason, GraphScoring graphScoring,
-                           GraphScoringProperties scoringProps, PathService pathService,
+                           GraphScoringProperties scoringProps,
                            ObjectMapper mapper) {
         this.movieRepo = movieRepo;
         this.edgeRepo  = edgeRepo;
         this.topReason = topReason;
         this.graphScoring = graphScoring;
         this.scoringProps = scoringProps;
-        this.pathService = pathService;
         this.mapper    = mapper;
     }
 
@@ -55,11 +52,6 @@ public class MovieController {
             return ResponseEntity.ok(List.of());
         }
         return ResponseEntity.ok(movieRepo.search(q.trim(), Math.min(limit, 50)));
-    }
-
-    @GetMapping("/{from}/path/{to}")
-    public ResponseEntity<?> path(@PathVariable long from, @PathVariable long to) {
-        return ResponseEntity.ok(pathService.shortestPath(from, to));
     }
 
     @GetMapping("/{id}")

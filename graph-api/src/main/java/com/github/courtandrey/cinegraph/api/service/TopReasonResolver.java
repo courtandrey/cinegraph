@@ -20,10 +20,6 @@ public class TopReasonResolver {
         return best != null ? humanize(best) : "Related films";
     }
 
-    /**
-     * The strongest shared-crew person on an edge, always naming the person. Path hops use
-     * this so a connection always reads as a person — never genres/keywords/release proximity.
-     */
     public String resolveCrewPerson(JsonNode arr) {
         if (arr == null || !arr.isArray()) return "Shared crew";
         JsonNode best = null;

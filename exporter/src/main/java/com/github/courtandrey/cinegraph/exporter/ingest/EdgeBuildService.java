@@ -60,12 +60,6 @@ import static org.jooq.impl.DSL.trueCondition;
 import static org.jooq.impl.DSL.val;
 import static org.jooq.impl.DSL.when;
 
-/**
- * Edge generation. All heavy work runs inside PostgreSQL; Java orchestrates DSL
- * statements across hash buckets so memory stays bounded and progress is
- * checkpointable. Full and incremental builds share UNLOGGED scratch tables and
- * therefore never run concurrently.
- */
 @Service
 public class EdgeBuildService {
 
@@ -78,16 +72,16 @@ public class EdgeBuildService {
     private final LoadRunRepository runRepo;
     private final RunRegistry runRegistry;
     private final ScoringProperties scoring;
-    private final ComponentBuildService componentBuild;
+    private final PathIndexService pathIndex;
 
     public EdgeBuildService(DSLContext ctx, LoadRunRepository runRepo,
                             RunRegistry runRegistry, ScoringProperties scoring,
-                            ComponentBuildService componentBuild) {
+                            PathIndexService pathIndex) {
         this.ctx = ctx;
         this.runRepo = runRepo;
         this.runRegistry = runRegistry;
         this.scoring = scoring;
-        this.componentBuild = componentBuild;
+        this.pathIndex = pathIndex;
     }
 
     public long triggerFullRebuild() {
@@ -151,7 +145,7 @@ public class EdgeBuildService {
             stats = runPass2(runId, incremental, cancelKey, stats);
 
             if (!incremental && !cancelled(cancelKey)) {
-                componentBuild.recompute();
+                pathIndex.recompute();
             }
 
             runRepo.finish(runId, RunStatus.COMPLETED, stats.toJson());

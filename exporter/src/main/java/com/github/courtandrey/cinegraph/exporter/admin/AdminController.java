@@ -2,14 +2,16 @@ package com.github.courtandrey.cinegraph.exporter.admin;
 
 import com.github.courtandrey.cinegraph.exporter.domain.RunKind;
 import com.github.courtandrey.cinegraph.exporter.domain.RunStatus;
-import com.github.courtandrey.cinegraph.exporter.ingest.ComponentBuildService;
 import com.github.courtandrey.cinegraph.exporter.ingest.EdgeBuildService;
 import com.github.courtandrey.cinegraph.exporter.ingest.FullLoadService;
+import com.github.courtandrey.cinegraph.exporter.ingest.PathIndexService;
 import com.github.courtandrey.cinegraph.exporter.ingest.IncrementalLoadService;
 import com.github.courtandrey.cinegraph.exporter.ingest.ReprojectService;
 import com.github.courtandrey.cinegraph.exporter.repo.FetchQueueRepository;
 import com.github.courtandrey.cinegraph.exporter.repo.LoadRunRepository;
 import io.vavr.control.Try;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,19 +24,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-/**
- * Admin API (X-Admin-Token protected).
- * POST /admin/full-load          - seed from the daily ID export and fetch everything
- * POST /admin/incremental       - fetch movies changed since the last sync
- * POST /admin/retry-stuck       - re-fetch stuck queue entries without re-seeding
- * POST /admin/reproject         - re-project all stored raw payloads (no fetching)
- * POST /admin/edges/rebuild     - full edge rebuild
- * POST /admin/edges/incremental - edge maintenance for one ingest run's dirty set
- * GET  /admin/runs/{id}         - run status and progress
- * POST /admin/runs/{id}/cancel  - cooperative cancellation
- */
 @RestController
 @RequestMapping("/admin")
 public class AdminController {
@@ -42,16 +34,19 @@ public class AdminController {
     private final FullLoadService fullLoadService;
     private final IncrementalLoadService incrementalLoadService;
     private final EdgeBuildService edgeBuildService;
-    private final ComponentBuildService componentBuildService;
+    private final PathIndexService pathIndexService;
     private final ReprojectService reprojectService;
     private final LoadRunRepository runRepo;
     private final FetchQueueRepository queueRepo;
     private final RunRegistry runRegistry;
 
+    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
+    private final AtomicBoolean pathIndexRunning = new AtomicBoolean(false);
+
     public AdminController(FullLoadService fullLoadService,
                            IncrementalLoadService incrementalLoadService,
                            EdgeBuildService edgeBuildService,
-                           ComponentBuildService componentBuildService,
+                           PathIndexService pathIndexService,
                            ReprojectService reprojectService,
                            LoadRunRepository runRepo,
                            FetchQueueRepository queueRepo,
@@ -59,7 +54,7 @@ public class AdminController {
         this.fullLoadService = fullLoadService;
         this.incrementalLoadService = incrementalLoadService;
         this.edgeBuildService = edgeBuildService;
-        this.componentBuildService = componentBuildService;
+        this.pathIndexService = pathIndexService;
         this.reprojectService = reprojectService;
         this.runRepo = runRepo;
         this.queueRepo = queueRepo;
@@ -101,12 +96,17 @@ public class AdminController {
         return accept(() -> edgeBuildService.triggerIncrementalEdges(ingestRunId), RunKind.EDGE_INCREMENTAL);
     }
 
-    /** Recompute movie.component_id without a full edge rebuild (backfill / after migration). */
-    @PostMapping("/edges/components")
-    public ResponseEntity<Map<String, Object>> recomputeComponents() {
-        Thread.ofPlatform().name("component-build").start(() ->
-                Try.run(componentBuildService::recompute));
-        return ResponseEntity.accepted().body(Map.of("status", "components recompute started"));
+    @PostMapping("/edges/path-index")
+    public ResponseEntity<Map<String, Object>> recomputePathIndex() {
+        if (!pathIndexRunning.compareAndSet(false, true)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "path-index recompute already running"));
+        }
+        Thread.ofPlatform().name("path-index-build").start(() ->
+                Try.run(pathIndexService::recompute)
+                        .onFailure(e -> log.error("path-index recompute failed", e))
+                        .andFinally(() -> pathIndexRunning.set(false)));
+        return ResponseEntity.accepted().body(Map.of("status", "path-index recompute started"));
     }
 
     @GetMapping("/runs/{id}")
