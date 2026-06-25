@@ -57,11 +57,29 @@ services:
       - "8080"
     networks: [cinegraph]
 
+  graph-engine:
+    image: registry.gitlab.com/courtandrey/cinegraph/graph-engine:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-cinegraph}
+      DB_USER: ${DB_USER:-cinegraph}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      JAVA_OPTS: ${ENGINE_JAVA_OPTS:--Xmx3g}
+    expose:
+      - "8085"
+    networks: [cinegraph]
+
   frontend:
     image: registry.gitlab.com/courtandrey/cinegraph/frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       - graph-api
+      - graph-engine
     environment:
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
     expose:

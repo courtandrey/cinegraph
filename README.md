@@ -42,6 +42,7 @@ read API.
 |---|---|
 | `exporter/` | Ingests TMDB data (full + incremental), generates similarity edges. Owns all Flyway migrations. Port 8081. |
 | `graph-api/` | REST API for search, movie details, graph payloads, edge breakdowns, and the Letterboxd graph builder. Read-only except for persisting uploaded Letterboxd film sets. Port 8080. |
+| `graph-engine/` | In-memory shortest-path service. Streams the whole movie graph into a CSR at startup and answers `GET /api/movies/{from}/path/{to}` via bidirectional BFS — no per-query DB round-trips. Port 8085. |
 | `frontend/` | Angular 18 standalone components; Cytoscape.js graph canvas. Dev server on port 4200. |
 | `db/migrations/` | Flyway SQL (V1–V7), executed by the exporter on startup. |
 

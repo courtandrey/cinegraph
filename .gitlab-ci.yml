@@ -30,6 +30,7 @@ build:
     paths:
       - exporter/target/*.jar
       - graph-api/target/*.jar
+      - graph-engine/target/*.jar
 
 images:
   stage: images
@@ -45,7 +46,7 @@ images:
   script:
     - export TAG="$CI_COMMIT_SHORT_SHA"
     - |
-      for svc in exporter graph-api frontend; do
+      for svc in exporter graph-api graph-engine frontend; do
         docker build -t "$IMAGE_BASE/$svc:$TAG" -t "$IMAGE_BASE/$svc:latest" "./$svc"
         docker push "$IMAGE_BASE/$svc:$TAG"
         docker push "$IMAGE_BASE/$svc:latest"

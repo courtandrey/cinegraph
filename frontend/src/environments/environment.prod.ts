@@ -1,6 +1,6 @@
 export const environment = {
   production: true,
   apiBase: '/api',
-  pathApiBase: '/api',
+  pathApiBase: '/path-api',
   gaMeasurementId: ''
 };
