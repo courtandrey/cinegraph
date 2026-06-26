@@ -15,11 +15,13 @@ spring:
 server:
   port: ${ENGINE_PORT:8085}
 
+grpc:
+  server:
+    port: ${ENGINE_GRPC_PORT:9090}
+
 engine:
   max-hops: ${ENGINE_MAX_HOPS:20}
   load-on-startup: ${ENGINE_LOAD_ON_STARTUP:true}
-  cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
 management:
   endpoints:

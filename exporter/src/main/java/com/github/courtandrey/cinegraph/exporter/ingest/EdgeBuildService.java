@@ -4,6 +4,7 @@ import com.github.courtandrey.cinegraph.exporter.admin.RunRegistry;
 import com.github.courtandrey.cinegraph.exporter.config.ScoringProperties;
 import com.github.courtandrey.cinegraph.exporter.domain.RunKind;
 import com.github.courtandrey.cinegraph.exporter.domain.RunStatus;
+import com.github.courtandrey.cinegraph.exporter.grpc.EngineClient;
 import com.github.courtandrey.cinegraph.exporter.repo.LoadRunRepository;
 import com.github.courtandrey.cinegraph.exporter.repo.PgSupport;
 import io.vavr.control.Try;
@@ -17,7 +18,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.CREDIT;
 import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.DIRTY_MOVIE;
@@ -73,15 +76,17 @@ public class EdgeBuildService {
     private final RunRegistry runRegistry;
     private final ScoringProperties scoring;
     private final PathIndexService pathIndex;
+    private final EngineClient engineClient;
 
     public EdgeBuildService(DSLContext ctx, LoadRunRepository runRepo,
                             RunRegistry runRegistry, ScoringProperties scoring,
-                            PathIndexService pathIndex) {
+                            PathIndexService pathIndex, EngineClient engineClient) {
         this.ctx = ctx;
         this.runRepo = runRepo;
         this.runRegistry = runRegistry;
         this.scoring = scoring;
         this.pathIndex = pathIndex;
+        this.engineClient = engineClient;
     }
 
     public long triggerFullRebuild() {
@@ -118,15 +123,19 @@ public class EdgeBuildService {
         boolean incremental = ingestRunId != null;
         log.info("[edge run {}] {} edge build started", runId, incremental ? "Incremental" : "Full");
         Stats stats = Stats.ZERO;
+        List<Long> dirtyIds = List.of();
+        Set<Long> degreeAffected = new HashSet<>();
         try {
             if (incremental) {
-                List<Long> dirtyIds = ctx.select(DIRTY_MOVIE.MOVIE_ID).from(DIRTY_MOVIE)
+                dirtyIds = ctx.select(DIRTY_MOVIE.MOVIE_ID).from(DIRTY_MOVIE)
                         .where(DIRTY_MOVIE.RUN_ID.eq(ingestRunId))
                         .fetch(DIRTY_MOVIE.MOVIE_ID);
                 if (dirtyIds.isEmpty()) {
                     runRepo.finish(runId, RunStatus.COMPLETED, "{\"dirty_ids\":0}");
                     return;
                 }
+                degreeAffected.addAll(dirtyIds);
+                degreeAffected.addAll(neighborsOf(dirtyIds));
                 stats = stats.plusDeleted(deleteEdgesTouching(dirtyIds));
                 seedDirtyScope(dirtyIds);
             } else {
@@ -144,8 +153,14 @@ public class EdgeBuildService {
             runRepo.updateStats(runId, stats.phaseJson("edgeCrewMerged", 1, 1));
             stats = runPass2(runId, incremental, cancelKey, stats);
 
-            if (!incremental && !cancelled(cancelKey)) {
-                pathIndex.recompute();
+            if (!cancelled(cancelKey)) {
+                if (incremental) {
+                    degreeAffected.addAll(neighborsOf(dirtyIds));
+                    PgSupport.computeDegreesFor(ctx, degreeAffected);
+                } else {
+                    pathIndex.recompute();
+                }
+                engineClient.triggerReload();
             }
 
             runRepo.finish(runId, RunStatus.COMPLETED, stats.toJson());
@@ -163,6 +178,13 @@ public class EdgeBuildService {
 
     private boolean cancelled(long cancelKey) {
         return runRegistry.isCancelled(cancelKey);
+    }
+
+    private Set<Long> neighborsOf(List<Long> ids) {
+        Long[] arr = ids.toArray(Long[]::new);
+        return new HashSet<>(ctx.select(EDGE.MOVIE_B).from(EDGE).where(EDGE.MOVIE_A.eq(any(arr)))
+                .union(ctx.select(EDGE.MOVIE_A).from(EDGE).where(EDGE.MOVIE_B.eq(any(arr))))
+                .fetch(0, Long.class));
     }
 
     private void truncateScratch() {

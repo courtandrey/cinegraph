@@ -40,9 +40,8 @@ public class GraphHolder {
         if (!loading.compareAndSet(false, true)) {
             return false;
         }
-        if (ref.get() == null) {
-            status = Status.LOADING;
-        }
+        ref.set(null);
+        status = Status.LOADING;
         Thread.ofPlatform().name("engine-graph-load").start(() -> {
             try {
                 ImmutableGraph graph = loader.load();
@@ -50,9 +49,7 @@ public class GraphHolder {
                 status = Status.READY;
             } catch (Exception e) {
                 log.error("[engine] graph load failed", e);
-                if (ref.get() == null) {
-                    status = Status.FAILED;
-                }
+                status = Status.FAILED;
             } finally {
                 loading.set(false);
             }

@@ -35,6 +35,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN:?TMDB_ACCESS_TOKEN is required}
       ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is required}
+      ENGINE_GRPC_ADDRESS: static://graph-engine:9090
       JAVA_OPTS: ${EXPORTER_JAVA_OPTS:-}
     ports:
       - "127.0.0.1:8081:8081"
@@ -46,12 +47,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      graph-engine:
+        condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-cinegraph}
       DB_USER: ${DB_USER:-cinegraph}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      ENGINE_GRPC_ADDRESS: static://graph-engine:9090
       JAVA_OPTS: ${GRAPH_API_JAVA_OPTS:-}
     expose:
       - "8080"
@@ -68,10 +72,10 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-cinegraph}
       DB_USER: ${DB_USER:-cinegraph}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       JAVA_OPTS: ${ENGINE_JAVA_OPTS:--Xmx3g}
     expose:
       - "8085"
+      - "9090"
     networks: [cinegraph]
 
   frontend:
@@ -79,7 +83,6 @@ services:
     restart: unless-stopped
     depends_on:
       - graph-api
-      - graph-engine
     environment:
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
     expose:

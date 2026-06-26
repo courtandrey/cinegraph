@@ -7,7 +7,6 @@ import { environment } from '../../environments/environment';
 export class MovieApiService {
   private http = inject(HttpClient);
   private readonly base = environment.apiBase;
-  private readonly pathBase = environment.pathApiBase;
 
   search(q: string, limit = 10) {
     return this.http.get<MovieSummary[]>(`${this.base}/movies/search`, {
@@ -43,7 +42,7 @@ export class MovieApiService {
   }
 
   findPath(from: number, to: number) {
-    return this.http.get<PathResult>(`${this.pathBase}/movies/${from}/path/${to}`);
+    return this.http.get<PathResult>(`${this.base}/movies/${from}/path/${to}`);
   }
 
   uploadLetterboxd(file: File) {

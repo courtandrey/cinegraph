@@ -24,7 +24,6 @@ public class GraphLoader {
     public ImmutableGraph load() {
         long start = System.currentTimeMillis();
 
-        // (movie_id, degree) ascending by id for the edge-incident films — sizes the CSR offsets.
         var rows = ctx.select(MOVIE.MOVIE_ID, MOVIE.DEGREE)
                 .from(MOVIE)
                 .where(MOVIE.DEGREE.gt(0))

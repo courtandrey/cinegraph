@@ -18,6 +18,12 @@ spring:
 server:
   port: 8081
 
+grpc:
+  client:
+    engine:
+      address: ${ENGINE_GRPC_ADDRESS:static://localhost:9090}
+      negotiation-type: plaintext
+
 management:
   endpoints:
     web:

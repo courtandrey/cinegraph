@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package cinegraph.path;
+
+option java_multiple_files = true;
+option java_package = "com.github.courtandrey.cinegraph.proto";
+option java_outer_classname = "PathProto";
+
+service PathService {
+  rpc ShortestPath (PathRequest) returns (PathReply);
+  rpc Reload (ReloadRequest) returns (ReloadReply);
+}
+
+message PathRequest {
+  int64 from = 1;
+  int64 to = 2;
+}
+
+enum PathStatus {
+  FOUND = 0;
+  NOT_FOUND = 1;
+  NOT_CONNECTED = 2;
+  UNREACHABLE = 3;
+  LOADING = 4;
+}
+
+message PathReply {
+  PathStatus status = 1;
+  int32 hops = 2;
+  repeated int64 movie_ids = 3;
+}
+
+message ReloadRequest {}
+
+message ReloadReply {
+  bool started = 1;
+  string state = 2;
+}
