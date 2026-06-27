@@ -15,10 +15,12 @@ export class FilmPanelComponent {
   @Input() breakdown: EdgeBreakdown | null = null;
   @Input() selectedNodeId: number | null = null;
   @Input() weightsActive = false;
+  @Input() pathEnabled = false;
 
   @Output() reCenter = new EventEmitter<number>();
   @Output() backToCenter = new EventEmitter<void>();
   @Output() adjustWeights = new EventEmitter<void>();
+  @Output() findPath = new EventEmitter<void>();
 
   get center(): MovieDetail | null {
     return this.graph?.center ?? null;

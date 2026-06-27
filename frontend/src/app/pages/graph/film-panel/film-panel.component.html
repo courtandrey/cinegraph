@@ -103,6 +103,11 @@
             <span class="weights-flag">CUSTOM</span>
           }
         </button>
+        @if (pathEnabled) {
+          <button class="find-path-btn" (click)="findPath.emit()">
+            ➜ FIND PATH TO A FILM
+          </button>
+        }
       </div>
     </div>
 

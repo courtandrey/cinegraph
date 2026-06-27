@@ -7,9 +7,6 @@
           <button class="back-btn" (click)="goBack()">← Back</button>
         }
         <button class="back-btn" (click)="exit()">{{ hash() ? 'My graph' : 'Search' }}</button>
-        @if (!hash()) {
-          <button class="back-btn" (click)="pathOpen.set(true)">Path to…</button>
-        }
       </div>
       <div class="controls">
         <span class="control-group">
@@ -79,6 +76,12 @@
     @if (selectedNodeId() !== null) { Why similar } @else { Film details }
   </button>
 
+  @if (!hash()) {
+    <button class="path-fab" [class.hidden]="infoOpen()" (click)="pathOpen.set(true)">
+      ➜ Find path
+    </button>
+  }
+
   <aside class="side-panel" [class.open]="infoOpen()">
     <button class="panel-collapse" (click)="infoOpen.set(false)">▾ Collapse</button>
     <app-film-panel
@@ -86,9 +89,11 @@
       [breakdown]="selectedBreakdown()"
       [selectedNodeId]="selectedNodeId()"
       [weightsActive]="weightsActive()"
+      [pathEnabled]="!hash()"
       (reCenter)="onReCenter($event)"
       (backToCenter)="onClearSelection()"
       (adjustWeights)="onAdjustWeights()"
+      (findPath)="pathOpen.set(true)"
     />
   </aside>
 
