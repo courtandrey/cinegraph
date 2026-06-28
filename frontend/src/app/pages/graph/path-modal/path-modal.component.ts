@@ -1,4 +1,5 @@
 import { Component, DestroyRef, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -24,6 +25,8 @@ export class PathModalComponent {
   private api = inject(MovieApiService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private doc = inject(DOCUMENT);
+  private prevViewport = '';
 
   readonly searchControl = new FormControl('');
   readonly results = signal<MovieSummary[]>([]);
@@ -47,6 +50,21 @@ export class PathModalComponent {
       this.results.set(r.filter(m => m.id !== this.fromId));
       this.searching.set(false);
     });
+
+    this.lockViewportZoom();
+    this.destroyRef.onDestroy(() => this.restoreViewportZoom());
+  }
+
+  private lockViewportZoom(): void {
+    const meta = this.doc.querySelector('meta[name="viewport"]');
+    if (!meta) return;
+    this.prevViewport = meta.getAttribute('content') ?? '';
+    meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+  }
+
+  private restoreViewportZoom(): void {
+    const meta = this.doc.querySelector('meta[name="viewport"]');
+    if (meta) meta.setAttribute('content', this.prevViewport || 'width=device-width, initial-scale=1');
   }
 
   private pressedOnBackdrop = false;
