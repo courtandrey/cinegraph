@@ -71,6 +71,6 @@ deploy:
         cd '$DEPLOY_PATH' &&
         export IMAGE_TAG='$CI_COMMIT_SHORT_SHA' &&
         docker compose -f docker-compose.prod.yml pull &&
-        docker compose -f docker-compose.prod.yml up -d &&
+        docker compose -f docker-compose.prod.yml up -d --no-recreate &&
         docker image prune -f
       "
