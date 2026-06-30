@@ -6,12 +6,12 @@
   left: 0;
   right: 0;
   height: 100vh;
-  height: 100dvh;
+  height: 100svh;
   z-index: 200;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 8dvh 16px 8dvh;
+  padding: 8svh 16px max(8svh, env(safe-area-inset-bottom));
   background: rgba(0, 0, 0, 0.55);
 }
 
