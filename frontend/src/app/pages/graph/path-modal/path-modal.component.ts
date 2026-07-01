@@ -37,6 +37,7 @@ export class PathModalComponent {
   constructor() {
     this.searchControl.valueChanges.pipe(
       tap(v => {
+        this.result.set(null);
         if (v && v.length >= 2) { this.searching.set(true); }
         else { this.searching.set(false); this.results.set([]); }
       }),
