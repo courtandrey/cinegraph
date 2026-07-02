@@ -64,7 +64,7 @@ public class GraphHolder {
             GraphSnapshot.write(snapshotPath, graph);
             log.info("[engine] wrote graph snapshot to {}", snapshotPath);
         } catch (IOException e) {
-            log.warn("[engine] failed to write snapshot {}: {}", snapshotPath, e.getMessage());
+            log.error("[engine] failed to write snapshot {}", snapshotPath, e);
         }
         return graph;
     }
