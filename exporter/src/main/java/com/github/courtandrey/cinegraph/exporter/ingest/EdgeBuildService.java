@@ -18,9 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.CREDIT;
 import static com.github.courtandrey.cinegraph.exporter.jooq.Tables.DIRTY_MOVIE;
@@ -75,17 +73,15 @@ public class EdgeBuildService {
     private final LoadRunRepository runRepo;
     private final RunRegistry runRegistry;
     private final ScoringProperties scoring;
-    private final PathIndexService pathIndex;
     private final EngineClient engineClient;
 
     public EdgeBuildService(DSLContext ctx, LoadRunRepository runRepo,
                             RunRegistry runRegistry, ScoringProperties scoring,
-                            PathIndexService pathIndex, EngineClient engineClient) {
+                            EngineClient engineClient) {
         this.ctx = ctx;
         this.runRepo = runRepo;
         this.runRegistry = runRegistry;
         this.scoring = scoring;
-        this.pathIndex = pathIndex;
         this.engineClient = engineClient;
     }
 
@@ -124,7 +120,6 @@ public class EdgeBuildService {
         log.info("[edge run {}] {} edge build started", runId, incremental ? "Incremental" : "Full");
         Stats stats = Stats.ZERO;
         List<Long> dirtyIds = List.of();
-        Set<Long> degreeAffected = new HashSet<>();
         try {
             if (incremental) {
                 dirtyIds = ctx.select(DIRTY_MOVIE.MOVIE_ID).from(DIRTY_MOVIE)
@@ -134,8 +129,6 @@ public class EdgeBuildService {
                     runRepo.finish(runId, RunStatus.COMPLETED, "{\"dirty_ids\":0}");
                     return;
                 }
-                degreeAffected.addAll(dirtyIds);
-                degreeAffected.addAll(neighborsOf(dirtyIds));
                 stats = stats.plusDeleted(deleteEdgesTouching(dirtyIds));
                 seedDirtyScope(dirtyIds);
             } else {
@@ -154,12 +147,6 @@ public class EdgeBuildService {
             stats = runPass2(runId, incremental, cancelKey, stats);
 
             if (!cancelled(cancelKey)) {
-                if (incremental) {
-                    degreeAffected.addAll(neighborsOf(dirtyIds));
-                    PgSupport.computeDegreesFor(ctx, degreeAffected);
-                } else {
-                    pathIndex.recompute();
-                }
                 engineClient.triggerReload();
             }
 
@@ -178,13 +165,6 @@ public class EdgeBuildService {
 
     private boolean cancelled(long cancelKey) {
         return runRegistry.isCancelled(cancelKey);
-    }
-
-    private Set<Long> neighborsOf(List<Long> ids) {
-        Long[] arr = ids.toArray(Long[]::new);
-        return new HashSet<>(ctx.select(EDGE.MOVIE_B).from(EDGE).where(EDGE.MOVIE_A.eq(any(arr)))
-                .union(ctx.select(EDGE.MOVIE_A).from(EDGE).where(EDGE.MOVIE_B.eq(any(arr))))
-                .fetch(0, Long.class));
     }
 
     private void truncateScratch() {

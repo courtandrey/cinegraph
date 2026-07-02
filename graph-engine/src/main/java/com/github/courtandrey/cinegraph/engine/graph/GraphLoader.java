@@ -6,9 +6,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import static com.github.courtandrey.cinegraph.engine.jooq.Tables.EDGE;
-import static com.github.courtandrey.cinegraph.engine.jooq.Tables.MOVIE;
 
 @Component
 public class GraphLoader {
@@ -24,39 +25,51 @@ public class GraphLoader {
     public ImmutableGraph load() {
         long start = System.currentTimeMillis();
 
-        var rows = ctx.select(MOVIE.MOVIE_ID, MOVIE.DEGREE)
-                .from(MOVIE)
-                .where(MOVIE.DEGREE.gt(0))
-                .orderBy(MOVIE.MOVIE_ID)
-                .fetch();
+        Map<Long, Integer> degree = new HashMap<>(1 << 21);
+        scanEdges((a, b) -> {
+            degree.merge(a, 1, Integer::sum);
+            degree.merge(b, 1, Integer::sum);
+        });
 
-        int n = rows.size();
-        long[] idByIdx = new long[n];
+        log.info("[engine] calculated degrees in {} ms", System.currentTimeMillis() - start);
+
+        int n = degree.size();
+        long[] idByIdx = degree.keySet().stream().mapToLong(Long::longValue).sorted().toArray();
         int[] offsets = new int[n + 1];
         for (int i = 0; i < n; i++) {
-            idByIdx[i] = rows.get(i).value1();
-            offsets[i + 1] = offsets[i] + rows.get(i).value2();
+            offsets[i + 1] = offsets[i] + degree.get(idByIdx[i]);
         }
         int[] neighbors = new int[offsets[n]];
         int[] cursor = offsets.clone();
 
+        scanEdges((a, b) -> {
+            int ia = Arrays.binarySearch(idByIdx, a);
+            int ib = Arrays.binarySearch(idByIdx, b);
+            neighbors[cursor[ia]++] = ib;
+            neighbors[cursor[ib]++] = ia;
+        });
+
+        ImmutableGraph graph = new ImmutableGraph(idByIdx, offsets, neighbors);
+        log.info("[engine] loaded graph from db: {} nodes, {} edges in {} ms",
+                n, graph.edgeCount(), System.currentTimeMillis() - start);
+        return graph;
+    }
+
+    private void scanEdges(EdgeConsumer consumer) {
         ctx.transaction(cfg -> {
             try (var edges = cfg.dsl().select(EDGE.MOVIE_A, EDGE.MOVIE_B)
                     .from(EDGE)
                     .fetchSize(50_000)
                     .fetchLazy()) {
                 for (var e : edges) {
-                    int a = Arrays.binarySearch(idByIdx, e.value1());
-                    int b = Arrays.binarySearch(idByIdx, e.value2());
-                    neighbors[cursor[a]++] = b;
-                    neighbors[cursor[b]++] = a;
+                    consumer.accept(e.value1(), e.value2());
                 }
             }
         });
+    }
 
-        ImmutableGraph graph = new ImmutableGraph(idByIdx, offsets, neighbors);
-        log.info("[engine] loaded graph: {} nodes, {} edges in {} ms",
-                n, graph.edgeCount(), System.currentTimeMillis() - start);
-        return graph;
+    @FunctionalInterface
+    private interface EdgeConsumer {
+        void accept(long movieA, long movieB);
     }
 }

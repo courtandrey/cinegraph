@@ -3,6 +3,7 @@ HELP.md
 .env.prod
 !.env.prod.example
 **/target/
+data/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

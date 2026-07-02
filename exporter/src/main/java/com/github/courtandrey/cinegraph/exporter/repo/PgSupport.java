@@ -7,37 +7,9 @@ import org.jooq.Table;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 
-import java.util.Collection;
-
 public final class PgSupport {
 
     private PgSupport() {}
-
-    public static void computeDegreesFor(DSLContext ctx, Collection<Long> movieIds) {
-        if (movieIds.isEmpty()) return;
-        ctx.execute("""
-                UPDATE movie m SET degree =
-                      (SELECT count(*) FROM edge e WHERE e.movie_a = m.movie_id)
-                    + (SELECT count(*) FROM edge e WHERE e.movie_b = m.movie_id)
-                WHERE m.movie_id = ANY(CAST(? AS BIGINT[]))
-                """, (Object) movieIds.toArray(Long[]::new));
-    }
-
-    public static void computeDegrees(DSLContext ctx) {
-        ctx.execute("""
-                UPDATE movie m SET degree = COALESCE(c.cnt, 0)
-                FROM (
-                    SELECT mv.movie_id AS id, agg.cnt
-                    FROM movie mv
-                    LEFT JOIN (
-                        SELECT node, count(*) AS cnt
-                        FROM (SELECT movie_a AS node FROM edge UNION ALL SELECT movie_b FROM edge) e
-                        GROUP BY node
-                    ) agg ON agg.node = mv.movie_id
-                ) c
-                WHERE m.movie_id = c.id
-                """);
-    }
 
     public static Field<JSONB> jsonbConcat(Field<JSONB> first, Field<JSONB>... rest) {
         Field<JSONB> acc = first;

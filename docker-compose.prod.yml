@@ -73,9 +73,12 @@ services:
       DB_USER: ${DB_USER:-cinegraph}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       JAVA_OPTS: ${ENGINE_JAVA_OPTS:--Xmx3g}
+      ENGINE_SNAPSHOT_PATH: /data/graph-snapshot.bin
     expose:
       - "8085"
       - "9090"
+    volumes:
+      - engine_data:/data
     networks: [cinegraph]
 
   frontend:
@@ -111,5 +114,6 @@ networks:
 
 volumes:
   pgdata:
+  engine_data:
   caddy_data:
   caddy_config:

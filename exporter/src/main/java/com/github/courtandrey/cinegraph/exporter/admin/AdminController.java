@@ -4,14 +4,11 @@ import com.github.courtandrey.cinegraph.exporter.domain.RunKind;
 import com.github.courtandrey.cinegraph.exporter.domain.RunStatus;
 import com.github.courtandrey.cinegraph.exporter.ingest.EdgeBuildService;
 import com.github.courtandrey.cinegraph.exporter.ingest.FullLoadService;
-import com.github.courtandrey.cinegraph.exporter.ingest.PathIndexService;
 import com.github.courtandrey.cinegraph.exporter.ingest.IncrementalLoadService;
 import com.github.courtandrey.cinegraph.exporter.ingest.ReprojectService;
 import com.github.courtandrey.cinegraph.exporter.repo.FetchQueueRepository;
 import com.github.courtandrey.cinegraph.exporter.repo.LoadRunRepository;
 import io.vavr.control.Try;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 @RestController
@@ -34,19 +30,14 @@ public class AdminController {
     private final FullLoadService fullLoadService;
     private final IncrementalLoadService incrementalLoadService;
     private final EdgeBuildService edgeBuildService;
-    private final PathIndexService pathIndexService;
     private final ReprojectService reprojectService;
     private final LoadRunRepository runRepo;
     private final FetchQueueRepository queueRepo;
     private final RunRegistry runRegistry;
 
-    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
-    private final AtomicBoolean pathIndexRunning = new AtomicBoolean(false);
-
     public AdminController(FullLoadService fullLoadService,
                            IncrementalLoadService incrementalLoadService,
                            EdgeBuildService edgeBuildService,
-                           PathIndexService pathIndexService,
                            ReprojectService reprojectService,
                            LoadRunRepository runRepo,
                            FetchQueueRepository queueRepo,
@@ -54,7 +45,6 @@ public class AdminController {
         this.fullLoadService = fullLoadService;
         this.incrementalLoadService = incrementalLoadService;
         this.edgeBuildService = edgeBuildService;
-        this.pathIndexService = pathIndexService;
         this.reprojectService = reprojectService;
         this.runRepo = runRepo;
         this.queueRepo = queueRepo;
@@ -94,19 +84,6 @@ public class AdminController {
                     .body(Map.of("error", "ingestRunId query parameter is required"));
         }
         return accept(() -> edgeBuildService.triggerIncrementalEdges(ingestRunId), RunKind.EDGE_INCREMENTAL);
-    }
-
-    @PostMapping("/edges/path-index")
-    public ResponseEntity<Map<String, Object>> recomputePathIndex() {
-        if (!pathIndexRunning.compareAndSet(false, true)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "path-index recompute already running"));
-        }
-        Thread.ofPlatform().name("path-index-build").start(() ->
-                Try.run(pathIndexService::recompute)
-                        .onFailure(e -> log.error("path-index recompute failed", e))
-                        .andFinally(() -> pathIndexRunning.set(false)));
-        return ResponseEntity.accepted().body(Map.of("status", "path-index recompute started"));
     }
 
     @GetMapping("/runs/{id}")

@@ -36,8 +36,7 @@ CREATE TABLE movie (
     poster_path       VARCHAR,
     overview          VARCHAR,
     countries         VARCHAR(255) ARRAY NOT NULL,
-    updated_at        TIMESTAMPTZ NOT NULL,
-    degree            INTEGER
+    updated_at        TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE genre (

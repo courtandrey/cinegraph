@@ -24,6 +24,18 @@ public final class ImmutableGraph {
         return neighbors.length / 2L;
     }
 
+    long[] ids() {
+        return idByIdx;
+    }
+
+    int[] offsets() {
+        return offsets;
+    }
+
+    int[] neighbors() {
+        return neighbors;
+    }
+
     public int indexOf(long movieId) {
         return Arrays.binarySearch(idByIdx, movieId);
     }
