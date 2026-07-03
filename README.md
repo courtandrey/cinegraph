@@ -42,8 +42,8 @@ read API.
 |---|---|
 | `exporter/` | Ingests TMDB data (full + incremental), generates similarity edges. Owns all Flyway migrations. Port 8081. |
 | `graph-api/` | REST API for search, movie details, graph payloads, edge breakdowns, and the Letterboxd graph builder. Read-only except for persisting uploaded Letterboxd film sets. Port 8080. |
-| `graph-engine/` | In-memory shortest-path service. Streams the whole movie graph into a CSR and answers bidirectional-BFS path queries over **gRPC** (unhydrated ids + hops). Internal-only: graph-api calls it and hydrates; the exporter triggers async rebuilds after edge changes. gRPC port 9090, actuator 8085. |
-| `graph-proto/` | Shared gRPC contract (`path.proto`) + generated stubs, depended on by graph-engine (server) and graph-api/exporter (clients). |
+| `graph-engine/` | In-memory shortest-path service. Streams the whole movie graph into a CSR and answers bidirectional-BFS path queries over **gRPC** (unhydrated ids + hops) — both whole-graph (`ShortestPath`) and constrained to an allowed node subset (`ShortestPathWithin`, used for Letterboxd-set paths). Internal-only: graph-api calls it and hydrates; the exporter triggers async rebuilds after edge changes. gRPC port 9090, actuator 8085. |
+| `graph-proto/` | Shared gRPC contract (`path.proto`: `ShortestPath`, `ShortestPathWithin`, `Reload`) + generated stubs, depended on by graph-engine (server) and graph-api/exporter (clients). |
 | `frontend/` | Angular 18 standalone components; Cytoscape.js graph canvas. Dev server on port 4200. |
 | `db/migrations/` | Flyway SQL (V1–V7), executed by the exporter on startup. |
 
@@ -106,6 +106,11 @@ least one neighbour.
 Every persisted edge stores a JSONB `components` array explaining the score — this is what
 drives the "WHY SIMILAR" panel and edge tooltips in the UI.
 
+**Find path** connects any two films by the fewest hops. From the centre film, searching a
+destination calls `GET /api/movies/{from}/path/{to}`; graph-api asks graph-engine for the
+shortest path over the whole movie graph and hydrates the returned ids into a node/edge chain.
+The Letterboxd view has the same feature scoped to your film set (see below).
+
 ## Letterboxd graphs
 
 From the search page, **Build a graph from your Letterboxd** accepts a CSV export
@@ -121,14 +126,26 @@ From the search page, **Build a graph from your Letterboxd** accepts a CSV expor
 3. **Overview graphs.** The induced sub-graph over the resolved films is split into connected
    components (orphans dropped, components under 5 nodes dropped, each capped to the largest
    `letterboxd.max-graph-nodes` by in-score). Each component is centred on its highest
-   **in-score** node (sum of incident edge scores) and returned biggest-first. The overview
-   lays nodes out by in-score (closer = more connected) and offers an in-score slider to
-   prune weakly-connected films.
+   **in-score** node and returned biggest-first. In-score is the sum of a film's incident edge
+   scores across the **whole component**, not just the rendered nodes — the node cap is a
+   rendering optimization only, so a film's score stays correct even when the neighbours that
+   earn it are hidden. The overview lays nodes out by in-score (closer = more connected) and
+   offers an in-score slider to prune weakly-connected films.
 4. **Deep-dive.** Clicking a film shows its details and total in-score; **Deep dive** re-centres
    on it via `POST /api/letterboxd/recenter` and drops into the same traversal UI as the search
    graph — re-centre, inspect edges, adjust weights — but every query is scoped to your film
    set (`…/recenter`, `…/reweight` take the hash). Nothing about the user graph is persisted
    beyond the hashed film set.
+5. **Search & connect.** The find button searches your whole set (not just the rendered nodes).
+   Picking a film reveals it; if it is connected in your set but capped out of the current view,
+   the shortest path to it **inside the set** is fetched (see below) and the connecting films are
+   pulled in so it never appears as a floating node. Films in no component at all are shown as
+   *disconnected* and can't be selected — there is no path to reach them.
+6. **Find path.** From a selected film, **Find path** searches any other film in the same graph
+   (visible or not) and highlights the shortest path between them **within your set**: path nodes
+   are enlarged, their edges lit, and the view fits to the path. The right panel lists the hop
+   chain; **Dismiss** (or tapping any node) clears it. On phone the path surfaces a *show details*
+   bar that opens a sheet with *collapse* / *dismiss*.
 
 ## Getting started
 
@@ -182,10 +199,14 @@ triggered manually via `POST /admin/incremental`.
 | `GET /api/movies/{id}` | Movie detail (title, year, genres, runtime, overview, …) |
 | `GET /api/movies/{id}/graph?minScore=&limit=` | Graph payload from stored scores: center + top-N neighbors + inter-neighbor edges (each edge carries its score components) |
 | `POST /api/movies/{id}/reweight` | Re-score all edges touching the center with custom weights (body `{limit, weights, minScore}`), return the new top-N |
+| `GET /api/movies/{from}/path/{to}` | Fewest-hop path between two films over the whole graph (via graph-engine), hydrated to nodes + edges |
 | `GET /api/edges/{a}/{b}` | Full similarity breakdown for one edge (side panel) |
 | `GET /api/roles` | Role taxonomy with default base weights (drives the graph-weights editor) |
 | `POST /api/letterboxd/graphs` | Upload a Letterboxd CSV (multipart `file`); resolves + persists the film set, returns `{hash, graphs}` |
 | `GET /api/letterboxd/{hash}/graphs` | Rebuild the overview graphs from a previously uploaded set (no file needed) |
+| `GET /api/letterboxd/{hash}/search?q=&limit=` | Typeahead over the films in a set, tagged with the component (`graphId`) each belongs to |
+| `GET /api/letterboxd/{hash}/path?from=&to=` | Fewest-hop path between two films **constrained to the set** (graph-engine `ShortestPathWithin`); powers reveal-connect and Find path |
+| `POST /api/letterboxd/attach` | Resolve a film's real in-score + its edges to the currently visible nodes (body `{hash, movieId, nodeIds}`) |
 | `POST /api/letterboxd/recenter` | Center graph on a film, scoped to the set (body `{hash, movieId, minScore, limit}`) |
 | `POST /api/letterboxd/reweight` | Re-score the set-scoped center graph with custom weights (body `{hash, movieId, limit, weights, minScore}`) |
 
