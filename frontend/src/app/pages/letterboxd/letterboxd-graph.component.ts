@@ -2,17 +2,24 @@ import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular
 import { ActivatedRoute, Router } from '@angular/router';
 import { GraphCanvasComponent } from '../graph/graph-canvas/graph-canvas.component';
 import { LetterboxdSearchComponent } from './letterboxd-search/letterboxd-search.component';
+import { LetterboxdPathModalComponent } from './letterboxd-path-modal/letterboxd-path-modal.component';
 import { LetterboxdStore } from '../../services/letterboxd-store.service';
 import { GraphStore } from '../../services/graph-store.service';
 import { MovieApiService } from '../../services/movie-api.service';
-import { GraphPayload, GraphNode, MovieDetail } from '../../models/movie.model';
+import { GraphPayload, GraphNode, GraphEdge, MovieDetail } from '../../models/movie.model';
+
+interface PathView {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
 
 const POSTER_W342 = 'https://image.tmdb.org/t/p/w342';
+const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
 
 @Component({
   selector: 'app-letterboxd-graph',
   standalone: true,
-  imports: [GraphCanvasComponent, LetterboxdSearchComponent],
+  imports: [GraphCanvasComponent, LetterboxdSearchComponent, LetterboxdPathModalComponent],
   templateUrl: './letterboxd-graph.component.html',
   styleUrl: './letterboxd-graph.component.scss'
 })
@@ -28,8 +35,14 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly status = signal<'loading' | 'ready' | 'error'>('ready');
   readonly thresholdDisplay = signal(this.store.inScoreThreshold());
   readonly searchOpen = signal(false);
-  readonly forcedNodeId = signal<number | null>(null);
+  readonly forcedNodeIds = signal<Set<number>>(new Set());
   readonly focusTarget = signal<{ id: number } | null>(null);
+
+  readonly pathSearchOpen = signal(false);
+  readonly path = signal<PathView | null>(null);
+  readonly pathSheetOpen = signal(false);
+  readonly pathNodeIds = computed(() => this.path()?.nodes.map(n => n.id) ?? null);
+
   private thresholdTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly inScoreById = computed(() => {
@@ -51,10 +64,10 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (!g) return null;
     const scores = this.inScoreById();
     const threshold = this.store.inScoreThreshold();
-    const forced = this.forcedNodeId();
+    const forced = this.forcedNodeIds();
 
     const keep = new Set<number>(
-      g.nodes.filter(n => (scores.get(n.id) ?? 0) >= threshold || n.id === forced).map(n => n.id)
+      g.nodes.filter(n => (scores.get(n.id) ?? 0) >= threshold || forced.has(n.id)).map(n => n.id)
     );
     const nodes = g.nodes.filter(n => keep.has(n.id));
     if (!nodes.length) return null;
@@ -93,6 +106,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   }
 
   onNodeTap(id: number): void {
+    if (this.path()) this.dismissPath();
     this.selectedNodeId.set(id);
     this.selectedDetail.set(null);
     const seq = ++this.detailSeq;
@@ -126,7 +140,8 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (this.thresholdTimer) clearTimeout(this.thresholdTimer);
     this.thresholdDisplay.set(0);
     this.store.setInScoreThreshold(0);
-    this.forcedNodeId.set(null);
+    this.forcedNodeIds.set(new Set());
+    this.dismissPath();
   }
 
   openSearch(): void {
@@ -136,9 +151,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   onSearchPick(sel: { movieId: number; graphId: number }): void {
     this.searchOpen.set(false);
     const idx = this.store.graphIndexByCenter(sel.graphId);
-    if (idx === -1) return;
-
-    if (idx !== this.store.index()) {
+    if (idx !== -1 && idx !== this.store.index()) {
       this.resetThreshold();
       this.store.setIndex(idx);
     }
@@ -146,7 +159,9 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     const g = this.store.current();
     if (!g) return;
 
-    if (g.nodes.some(n => n.id === sel.movieId)) {
+    const inGraph = g.nodes.some(n => n.id === sel.movieId);
+    const hasVisibleEdge = g.edges.some(e => e.source === sel.movieId || e.target === sel.movieId);
+    if (inGraph && hasVisibleEdge) {
       this.revealAndFocus(sel.movieId);
       return;
     }
@@ -155,17 +170,72 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (!hash) return;
     this.api.letterboxdAttach(hash, sel.movieId, g.nodes.map(n => n.id)).subscribe({
       next: att => {
-        this.store.mergeIntoCurrent(att.node, att.edges);
-        this.revealAndFocus(sel.movieId);
+        if (att.edges.length > 0) {
+          this.store.mergeIntoCurrent(att.node, att.edges);
+          this.revealAndFocus(sel.movieId);
+        } else {
+          this.store.mergeIntoCurrent(att.node, []);
+          this.connectViaPath(sel.movieId, g.centerId);
+        }
       },
-      error: () => this.revealAndFocus(sel.movieId)
+      error: () => this.connectViaPath(sel.movieId, g.centerId)
+    });
+  }
+
+  private connectViaPath(movieId: number, targetId: number): void {
+    const hash = this.store.hash();
+    if (!hash) { this.revealAndFocus(movieId); return; }
+    this.api.letterboxdPath(hash, movieId, targetId).subscribe({
+      next: res => {
+        if (res.found && res.nodes.length) {
+          this.store.mergeManyIntoCurrent(res.nodes, res.edges);
+          this.forceReveal(res.nodes.map(n => n.id));
+        }
+        this.revealAndFocus(movieId);
+      },
+      error: () => this.revealAndFocus(movieId)
+    });
+  }
+
+  private forceReveal(ids: number[]): void {
+    this.forcedNodeIds.update(s => {
+      const next = new Set(s);
+      ids.forEach(id => next.add(id));
+      return next;
     });
   }
 
   private revealAndFocus(movieId: number): void {
-    this.forcedNodeId.set(movieId);
+    this.forceReveal([movieId]);
     this.onNodeTap(movieId);
     this.focusTarget.set({ id: movieId });
+  }
+
+  openPathSearch(): void {
+    if (this.selectedNodeId() == null) return;
+    this.pathSearchOpen.set(true);
+  }
+
+  onPathPick(targetId: number): void {
+    this.pathSearchOpen.set(false);
+    const sourceId = this.selectedNodeId();
+    const hash = this.store.hash();
+    if (sourceId == null || !hash || sourceId === targetId) return;
+    this.api.letterboxdPath(hash, sourceId, targetId).subscribe({
+      next: res => {
+        if (!res.found || res.nodes.length < 2) return;
+        this.store.mergeManyIntoCurrent(res.nodes, res.edges);
+        this.forceReveal(res.nodes.map(n => n.id));
+        this.onClearSelection();
+        this.path.set({ nodes: res.nodes, edges: res.edges });
+        this.pathSheetOpen.set(false);
+      }
+    });
+  }
+
+  dismissPath(): void {
+    this.path.set(null);
+    this.pathSheetOpen.set(false);
   }
 
   prev(): void {
@@ -180,8 +250,28 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.store.next();
   }
 
+  focusNode(id: number): void {
+    this.focusTarget.set({ id });
+  }
+
+  pathRightInset(): number {
+    return window.innerWidth > 820 ? 340 : 0;
+  }
+
+  readonly pathGraphId = computed(() => this.store.current()?.centerId ?? 0);
+
+  readonly pathSourceTitle = computed(() => {
+    const g = this.store.current();
+    const src = this.selectedNodeId();
+    return g?.nodes.find(n => n.id === src)?.title ?? '';
+  });
+
   posterW342(path: string | null): string | null {
     return path ? `${POSTER_W342}${path}` : null;
+  }
+
+  posterW92(path: string | null): string | null {
+    return path ? `${POSTER_W92}${path}` : null;
   }
 }
 

@@ -40,6 +40,8 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
   @Input() selectedNodeId: number | null = null;
   @Input() layoutByInScore = false;
   @Input() focus: { id: number } | null = null;
+  @Input() pathNodeIds: number[] | null = null;
+  @Input() pathRightInset = 0;
 
   @Output() nodeTap = new EventEmitter<number>();
   @Output() clearSelection = new EventEmitter<void>();
@@ -52,6 +54,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
   private cy: Core | null = null;
   private large = false;
   private pendingFocus: number | null = null;
+  private pendingPath = false;
   private lastLayoutCenter: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private resizeRaf = 0;
@@ -76,6 +79,10 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
     if (changes['focus'] && this.focus) {
       this.pendingFocus = this.focus.id;
       if (!rebuilt) this.runPendingFocus();
+    }
+    if (changes['pathNodeIds']) {
+      this.pendingPath = true;
+      if (!rebuilt) this.runPendingPath();
     }
   }
 
@@ -229,11 +236,61 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
       const fit = this.lastLayoutCenter !== this.centerId;
       this.lastLayoutCenter = this.centerId;
       const layout = cy.layout(this.buildLayout(fit) as any);
-      layout.one('layoutstop', () => this.runPendingFocus());
+      layout.one('layoutstop', () => { this.runPendingFocus(); this.runPendingPath(); });
       layout.run();
 
       this.applySelection();
     });
+  }
+
+  private runPendingPath(): void {
+    if (!this.pendingPath || !this.cy) return;
+    this.pendingPath = false;
+    this.applyPath();
+  }
+
+  private applyPath(): void {
+    if (!this.cy) return;
+    const ids = this.pathNodeIds;
+    this.ngZone.runOutsideAngular(() => {
+      const cy = this.cy!;
+      let nodes = cy.collection();
+      cy.batch(() => {
+        cy.elements().removeClass('path-node path-edge');
+        if (!ids || ids.length === 0) return;
+        for (const id of ids) nodes = nodes.union(cy.$id(String(id)).addClass('path-node'));
+        for (let i = 0; i + 1 < ids.length; i++) {
+          cy.$id(`e_${ids[i]}_${ids[i + 1]}`)
+            .union(cy.$id(`e_${ids[i + 1]}_${ids[i]}`))
+            .addClass('path-edge');
+        }
+      });
+      if (nodes.nonempty()) {
+        cy.stop();
+        cy.animate(this.fitViewport(nodes), { duration: 450, easing: 'ease-in-out-cubic' });
+      }
+    });
+  }
+
+  private fitViewport(eles: cytoscape.Collection): { zoom: number; pan: { x: number; y: number } } {
+    const cy = this.cy!;
+    const el = this.containerRef.nativeElement;
+    const pad = this.fitPadding();
+    const inset = Math.max(0, this.pathRightInset);
+    const availW = Math.max(60, el.clientWidth - inset - 2 * pad);
+    const availH = Math.max(60, el.clientHeight - 2 * pad);
+
+    const bb = eles.boundingBox({});
+    const zoom = Math.max(cy.minZoom(),
+      Math.min(cy.maxZoom(), 1.5, availW / bb.w, availH / bb.h));
+
+    return {
+      zoom,
+      pan: {
+        x: (el.clientWidth - inset) / 2 - zoom * (bb.x1 + bb.w / 2),
+        y: el.clientHeight / 2 - zoom * (bb.y1 + bb.h / 2)
+      }
+    };
   }
 
   private runPendingFocus(): void {
@@ -268,7 +325,6 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
         const adjEdges = sel.connectedEdges();
         const adjNodes = adjEdges.connectedNodes();
 
-        // Dim non-adjacent nodes
         cy.nodes()
           .difference(sel)
           .difference(adjNodes)
@@ -348,10 +404,6 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
             const p = ele.data('posterPath') as string | null;
             return p ? `${posterBase}${p}` : 'none';
           },
-          // Load posters without CORS: image.tmdb.org sometimes serves cached responses
-          // missing the ACAO header (poisoned by prior non-CORS <img> loads of the same
-          // file), which blocks crossorigin requests. We never read canvas pixels, so a
-          // tainted canvas is harmless.
           'background-image-crossorigin': 'null',
           'background-fit': 'cover',
           'background-clip': 'node',
@@ -385,6 +437,24 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
         style: {
           'border-width': 3,
           'border-color': '#40bcf4'
+        }
+      },
+      {
+        selector: 'node.path-node',
+        style: {
+          width: 120,
+          height: 180,
+          'border-width': 4,
+          'border-color': '#ff8000',
+          opacity: 1,
+          'z-index': 20
+        }
+      },
+      {
+        selector: 'node.path-node[?isCenter]',
+        style: {
+          width: 136,
+          height: 204
         }
       },
       {
@@ -433,6 +503,15 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
         style: {
           'line-color': '#ff8000',
           opacity: 1
+        }
+      },
+      {
+        selector: 'edge.path-edge',
+        style: {
+          'line-color': '#ff8000',
+          width: 4,
+          opacity: 1,
+          'z-index': 19
         }
       }
     ];

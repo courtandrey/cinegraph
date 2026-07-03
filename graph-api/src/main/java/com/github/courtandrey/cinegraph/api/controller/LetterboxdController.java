@@ -64,6 +64,13 @@ public class LetterboxdController {
         return ResponseEntity.ok(service.search(hash, q.trim(), Math.min(limit, 50)));
     }
 
+    @GetMapping("/{hash}/path")
+    public ResponseEntity<?> path(@PathVariable String hash,
+                                  @RequestParam long from,
+                                  @RequestParam long to) {
+        return ResponseEntity.ok(service.pathWithinSet(hash, from, to));
+    }
+
     @PostMapping("/attach")
     public ResponseEntity<?> attach(@RequestBody AttachRequest req) {
         if (req.hash() == null || req.movieId() == null) {

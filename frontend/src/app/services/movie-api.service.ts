@@ -61,6 +61,12 @@ export class MovieApiService {
     });
   }
 
+  letterboxdPath(hash: string, from: number, to: number) {
+    return this.http.get<PathResult>(`${this.base}/letterboxd/${hash}/path`, {
+      params: { from: from.toString(), to: to.toString() }
+    });
+  }
+
   letterboxdAttach(hash: string, movieId: number, nodeIds: number[]) {
     return this.http.post<LetterboxdAttachment>(`${this.base}/letterboxd/attach`, {
       hash, movieId, nodeIds

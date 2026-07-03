@@ -1,4 +1,4 @@
-<div class="lbxd-page">
+<div class="lbxd-page" [class.path-active]="path() !== null" [class.path-sheet-open]="pathSheetOpen()">
   <div class="toolbar">
     <button class="back-btn" (click)="router.navigate(['/'])">Search</button>
     <span class="title-hint">Click a film to inspect it</span>
@@ -23,6 +23,8 @@
           [layoutByInScore]="true"
           [selectedNodeId]="selectedNodeId()"
           [focus]="focusTarget()"
+          [pathNodeIds]="pathNodeIds()"
+          [pathRightInset]="pathRightInset()"
           (nodeTap)="onNodeTap($event)"
           (clearSelection)="onClearSelection()"
         />
@@ -51,9 +53,42 @@
           }
         </div>
       }
+
+      @if (path() && !pathSheetOpen()) {
+        <button class="path-bar" (click)="pathSheetOpen.set(true)">
+          <span class="path-bar-arrow">↑</span> Show details
+        </button>
+      }
     </div>
 
-    @if (selectedNodeId() !== null) {
+    @if (path(); as pv) {
+      <aside class="side-panel path-panel">
+        <button class="panel-collapse path-collapse" (click)="pathSheetOpen.set(false)">▾ Collapse</button>
+
+        <div class="detail-scroll">
+          <div class="path-summary">{{ pv.edges.length }} hop{{ pv.edges.length === 1 ? '' : 's' }}</div>
+          <ol class="chain">
+            @for (n of pv.nodes; track n.id; let i = $index) {
+              <li class="chain-node" (click)="focusNode(n.id)">
+                @if (posterW92(n.posterPath); as src) {
+                  <img class="chain-thumb" [src]="src" [alt]="n.title" />
+                } @else {
+                  <div class="chain-thumb chain-thumb--empty"></div>
+                }
+                <span class="chain-title">{{ n.title }}@if (n.year) { <span class="chain-year">{{ n.year }}</span> }</span>
+              </li>
+              @if (i < pv.edges.length) {
+                <li class="chain-link">↓ {{ pv.edges[i].topReason }}</li>
+              }
+            }
+          </ol>
+        </div>
+
+        <div class="panel-footer">
+          <button class="dismiss-btn" (click)="dismissPath()">DISMISS PATH</button>
+        </div>
+      </aside>
+    } @else if (selectedNodeId() !== null) {
       <aside class="side-panel">
       <button class="panel-collapse" (click)="onClearSelection()">▾ Collapse</button>
 
@@ -99,7 +134,10 @@
       }
 
       <div class="panel-footer">
-        <button class="deep-dive-btn" (click)="deepDive()">DEEP DIVE</button>
+        <div class="footer-btns">
+          <button class="find-path-btn" (click)="openPathSearch()">FIND PATH</button>
+          <button class="deep-dive-btn" (click)="deepDive()">DEEP DIVE</button>
+        </div>
       </div>
     </aside>
     }
@@ -107,5 +145,16 @@
 
   @if (searchOpen()) {
     <app-letterboxd-search (pick)="onSearchPick($event)" (closed)="searchOpen.set(false)" />
+  }
+
+  @if (pathSearchOpen()) {
+    <app-letterboxd-path-modal
+      [fromTitle]="pathSourceTitle()"
+      [hash]="store.hash() ?? ''"
+      [graphId]="pathGraphId()"
+      [excludeId]="selectedNodeId()"
+      (pick)="onPathPick($event)"
+      (closed)="pathSearchOpen.set(false)"
+    />
   }
 </div>

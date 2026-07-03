@@ -8,12 +8,19 @@ option java_outer_classname = "PathProto";
 
 service PathService {
   rpc ShortestPath (PathRequest) returns (PathReply);
+  rpc ShortestPathWithin (SubsetPathRequest) returns (PathReply);
   rpc Reload (ReloadRequest) returns (ReloadReply);
 }
 
 message PathRequest {
   int64 from = 1;
   int64 to = 2;
+}
+
+message SubsetPathRequest {
+  int64 from = 1;
+  int64 to = 2;
+  repeated int64 allowed = 3;
 }
 
 enum PathStatus {

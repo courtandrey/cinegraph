@@ -53,6 +53,22 @@ export class LetterboxdStore {
     });
   }
 
+  mergeManyIntoCurrent(nodes: GraphNode[], edges: GraphEdge[]): void {
+    this._graphs.update(graphs => {
+      const i = this._index();
+      const g = graphs[i];
+      if (!g) return graphs;
+      const have = new Set(g.nodes.map(n => n.id));
+      const addNodes = nodes.filter(n => !have.has(n.id));
+      const seen = new Set(g.edges.map(e => `${e.source}-${e.target}`));
+      const addEdges = edges.filter(e =>
+        !seen.has(`${e.source}-${e.target}`) && !seen.has(`${e.target}-${e.source}`));
+      const next = [...graphs];
+      next[i] = { ...g, nodes: [...g.nodes, ...addNodes], edges: [...g.edges, ...addEdges] };
+      return next;
+    });
+  }
+
   next(): void {
     this._index.update(i => Math.min(i + 1, this._graphs().length - 1));
   }

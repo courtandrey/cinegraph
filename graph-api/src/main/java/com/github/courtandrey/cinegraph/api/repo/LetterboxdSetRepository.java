@@ -44,11 +44,6 @@ public class LetterboxdSetRepository {
         batch.execute();
     }
 
-    public boolean graphIdBaked(String hash) {
-        return ctx.fetchExists(selectOne().from(LETTERBOXD_SET)
-                .where(LETTERBOXD_SET.HASH.eq(hash).and(LETTERBOXD_SET.GRAPH_ID.isNotNull())));
-    }
-
     public void updateGraphIds(String hash, Map<Long, Long> graphIdByMovie) {
         if (graphIdByMovie.isEmpty()) return;
         var update = ctx.update(LETTERBOXD_SET)

@@ -36,7 +36,7 @@
             <span class="title">{{ movie.title }}</span>
             @if (movie.year) { <span class="year">{{ movie.year }}</span> }
             @if (!isConnected(movie)) {
-              <span class="not-connected">Not connected to any graph</span>
+              <span class="not-connected">Disconnected — no path can be built</span>
             }
           </li>
         }

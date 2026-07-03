@@ -8,6 +8,7 @@ import com.github.courtandrey.cinegraph.proto.PathServiceGrpc;
 import com.github.courtandrey.cinegraph.proto.PathStatus;
 import com.github.courtandrey.cinegraph.proto.ReloadReply;
 import com.github.courtandrey.cinegraph.proto.ReloadRequest;
+import com.github.courtandrey.cinegraph.proto.SubsetPathRequest;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,12 @@ public class PathGrpcService extends PathServiceGrpc.PathServiceImplBase {
         responseObserver.onCompleted();
     }
 
+    @Override
+    public void shortestPathWithin(SubsetPathRequest request, StreamObserver<PathReply> responseObserver) {
+        responseObserver.onNext(computePathWithin(request));
+        responseObserver.onCompleted();
+    }
+
     private PathReply computePath(long from, long to) {
         ImmutableGraph g = holder.graph();
         if (g == null || !holder.isReady()) {
@@ -42,7 +49,29 @@ public class PathGrpcService extends PathServiceGrpc.PathServiceImplBase {
         if (fromIdx < 0 || toIdx < 0 || !g.sameComponent(fromIdx, toIdx)) {
             return PathReply.newBuilder().setStatus(PathStatus.NOT_CONNECTED).build();
         }
-        long[] path = g.shortestPath(fromIdx, toIdx, maxHops);
+        return toReply(g.shortestPath(fromIdx, toIdx, maxHops));
+    }
+
+    private PathReply computePathWithin(SubsetPathRequest request) {
+        ImmutableGraph g = holder.graph();
+        if (g == null || !holder.isReady()) {
+            return PathReply.newBuilder().setStatus(PathStatus.LOADING).build();
+        }
+        long from = request.getFrom();
+        long to = request.getTo();
+        if (from == to) {
+            return PathReply.newBuilder().setStatus(PathStatus.FOUND).setHops(0).addMovieIds(from).build();
+        }
+        int fromIdx = g.indexOf(from);
+        int toIdx = g.indexOf(to);
+        if (fromIdx < 0 || toIdx < 0) {
+            return PathReply.newBuilder().setStatus(PathStatus.NOT_CONNECTED).build();
+        }
+        boolean[] allowed = g.allowedMask(request.getAllowedList());
+        return toReply(g.shortestPathWithin(fromIdx, toIdx, allowed, maxHops));
+    }
+
+    private PathReply toReply(long[] path) {
         if (path == null) {
             return PathReply.newBuilder().setStatus(PathStatus.UNREACHABLE).build();
         }

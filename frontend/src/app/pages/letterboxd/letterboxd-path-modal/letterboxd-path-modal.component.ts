@@ -1,57 +1,53 @@
-import { Component, DestroyRef, EventEmitter, Output, inject, signal } from '@angular/core';
+import { Component, DestroyRef, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { catchError, debounceTime, switchMap, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { MovieApiService } from '../../../services/movie-api.service';
-import { LetterboxdStore } from '../../../services/letterboxd-store.service';
 import { LetterboxdSearchResult } from '../../../models/movie.model';
 
 const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
 
 @Component({
-  selector: 'app-letterboxd-search',
+  selector: 'app-letterboxd-path-modal',
   standalone: true,
   imports: [ReactiveFormsModule],
-  templateUrl: './letterboxd-search.component.html',
-  styleUrl: './letterboxd-search.component.scss'
+  templateUrl: './letterboxd-path-modal.component.html',
+  styleUrl: './letterboxd-path-modal.component.scss'
 })
-export class LetterboxdSearchComponent {
+export class LetterboxdPathModalComponent {
+  @Input() fromTitle = '';
+  @Input({ required: true }) hash!: string;
+  @Input({ required: true }) graphId!: number;
+  @Input() excludeId: number | null = null;
+
+  @Output() pick = new EventEmitter<number>();
+  @Output() closed = new EventEmitter<void>();
+
   private api = inject(MovieApiService);
-  private store = inject(LetterboxdStore);
   private destroyRef = inject(DestroyRef);
   private doc = inject(DOCUMENT);
   private prevViewport = '';
 
-  @Output() pick = new EventEmitter<{ movieId: number; graphId: number }>();
-  @Output() closed = new EventEmitter<void>();
-
   readonly searchControl = new FormControl('');
   readonly results = signal<LetterboxdSearchResult[]>([]);
   readonly loading = signal(false);
-  readonly activeIndex = signal(-1);
 
   constructor() {
     this.searchControl.valueChanges.pipe(
       tap(v => {
-        if (v && v.length >= 2) {
-          this.loading.set(true);
-        } else {
-          this.loading.set(false);
-          this.results.set([]);
-        }
+        if (v && v.length >= 2) { this.loading.set(true); }
+        else { this.loading.set(false); this.results.set([]); }
       }),
       debounceTime(250),
-      switchMap(v => {
-        const hash = this.store.hash();
-        if (!hash || !v || v.length < 2) return of<LetterboxdSearchResult[]>([]);
-        return this.api.letterboxdSearch(hash, v).pipe(catchError(() => of<LetterboxdSearchResult[]>([])));
-      }),
+      switchMap(v =>
+        (!v || v.length < 2)
+          ? of<LetterboxdSearchResult[]>([])
+          : this.api.letterboxdSearch(this.hash, v).pipe(catchError(() => of<LetterboxdSearchResult[]>([])))),
       takeUntilDestroyed(this.destroyRef)
-    ).subscribe(results => {
-      this.results.set(results);
-      this.activeIndex.set(-1);
+    ).subscribe(res => {
+      this.results.set(res.filter(m => m.graphId === this.graphId && m.id !== this.excludeId));
       this.loading.set(false);
     });
 
@@ -81,31 +77,11 @@ export class LetterboxdSearchComponent {
     if (this.pressedOnBackdrop && e.target === e.currentTarget) this.closed.emit();
   }
 
-  isConnected(movie: LetterboxdSearchResult): boolean {
-    return movie.graphId != null && movie.graphId !== 0;
-  }
-
   posterUrl(path: string | null): string | null {
     return path ? `${POSTER_W92}${path}` : null;
   }
 
   select(movie: LetterboxdSearchResult): void {
-    if (this.isConnected(movie)) this.pick.emit({ movieId: movie.id, graphId: movie.graphId! });
-  }
-
-  onKeydown(event: KeyboardEvent): void {
-    const len = this.results().length;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      this.activeIndex.update(i => Math.min(i + 1, len - 1));
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      this.activeIndex.update(i => Math.max(i - 1, -1));
-    } else if (event.key === 'Enter') {
-      const m = this.results()[this.activeIndex()];
-      if (m) this.select(m);
-    } else if (event.key === 'Escape') {
-      this.closed.emit();
-    }
+    this.pick.emit(movie.id);
   }
 }

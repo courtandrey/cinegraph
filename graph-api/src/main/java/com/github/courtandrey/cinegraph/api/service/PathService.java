@@ -8,6 +8,7 @@ import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository;
 import com.github.courtandrey.cinegraph.proto.PathReply;
 import com.github.courtandrey.cinegraph.proto.PathRequest;
 import com.github.courtandrey.cinegraph.proto.PathServiceGrpc;
+import com.github.courtandrey.cinegraph.proto.SubsetPathRequest;
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,16 @@ public class PathService {
 
     public PathResult shortestPath(long from, long to) {
         PathReply reply = engine.shortestPath(PathRequest.newBuilder().setFrom(from).setTo(to).build());
+        return toResult(reply);
+    }
+
+    public PathResult shortestPathWithin(long from, long to, List<Long> allowed) {
+        PathReply reply = engine.shortestPathWithin(SubsetPathRequest.newBuilder()
+                .setFrom(from).setTo(to).addAllAllowed(allowed).build());
+        return toResult(reply);
+    }
+
+    private PathResult toResult(PathReply reply) {
         return switch (reply.getStatus()) {
             case FOUND -> hydrate(reply.getMovieIdsList());
             case NOT_CONNECTED -> fail("not_connected");

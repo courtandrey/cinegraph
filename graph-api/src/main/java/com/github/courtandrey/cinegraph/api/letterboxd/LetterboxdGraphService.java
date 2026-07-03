@@ -13,6 +13,7 @@ import com.github.courtandrey.cinegraph.api.repo.LetterboxdSetRepository.MovieRa
 import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository;
 import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository.TitleYearMatch;
 import com.github.courtandrey.cinegraph.api.service.GraphScoring;
+import com.github.courtandrey.cinegraph.api.service.PathService;
 import com.github.courtandrey.cinegraph.api.service.TopReasonResolver;
 import io.vavr.control.Try;
 import lombok.extern.slf4j.Slf4j;
@@ -49,12 +50,13 @@ public class LetterboxdGraphService {
     private final GraphScoringProperties scoringProps;
     private final ObjectMapper mapper;
     private final LetterboxdProperties props;
+    private final PathService pathService;
 
     public LetterboxdGraphService(LetterboxdClient client, MovieQueryRepository movieRepo,
                                   EdgeQueryRepository edgeRepo, LetterboxdSetRepository setRepo,
                                   TopReasonResolver topReason, GraphScoring graphScoring,
                                   GraphScoringProperties scoringProps, ObjectMapper mapper,
-                                  LetterboxdProperties props) {
+                                  LetterboxdProperties props, PathService pathService) {
         this.client = client;
         this.movieRepo = movieRepo;
         this.edgeRepo = edgeRepo;
@@ -64,6 +66,11 @@ public class LetterboxdGraphService {
         this.scoringProps = scoringProps;
         this.mapper = mapper;
         this.props = props;
+        this.pathService = pathService;
+    }
+
+    public PathResult pathWithinSet(String hash, long from, long to) {
+        return pathService.shortestPathWithin(from, to, setRepo.loadMovieIds(hash));
     }
 
     public LetterboxdUploadResponse buildGraphs(String hash, String csv) {
@@ -71,13 +78,13 @@ public class LetterboxdGraphService {
                 ? setRepo.loadMovieIds(hash)
                 : resolveAndStore(hash, csv);
         Assembled a = assemble(movieIds);
-        bakeGraphIdsIfMissing(hash, a);
+        bakeGraphIds(hash, a);
         return new LetterboxdUploadResponse(hash, a.graphs());
     }
 
     public List<LetterboxdGraph> overview(String hash) {
         Assembled a = assemble(setRepo.loadMovieIds(hash));
-        bakeGraphIdsIfMissing(hash, a);
+        bakeGraphIds(hash, a);
         return a.graphs();
     }
 
@@ -104,8 +111,8 @@ public class LetterboxdGraphService {
         });
     }
 
-    private void bakeGraphIdsIfMissing(String hash, Assembled a) {
-        if (!setRepo.graphIdBaked(hash)) setRepo.updateGraphIds(hash, a.graphIdByMovie());
+    private void bakeGraphIds(String hash, Assembled a) {
+        setRepo.updateGraphIds(hash, a.graphIdByMovie());
     }
 
     public Optional<GraphPayload> recenter(String hash, long movieId, float minScore, int limit) {
@@ -222,8 +229,10 @@ public class LetterboxdGraphService {
         List<Built> built = new ArrayList<>();
         Map<Long, Long> graphIdByMovie = new HashMap<>();
         for (Graphs.Component comp : Graphs.components(edges)) {
+            // In-score reflects the whole persisted component, not the capped view — a node's
+            // score must include edges to films that were dropped for rendering performance.
+            Map<Long, Double> inScore = Graphs.edgeSums(comp.edges());
             Graphs.Component withNodes = Graphs.capNodes(comp, props.getMaxGraphNodes());
-            Map<Long, Double> inScore = Graphs.edgeSums(withNodes.edges());
             Graphs.Component view = Graphs.capEdgesPerNode(
                     withNodes, props.getMinEdgesPerNode(), props.getMinScoreForNonEssential());
             if (view.nodeIds().size() >= props.getMinGraphNodes()) {

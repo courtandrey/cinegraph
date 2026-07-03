@@ -49,6 +49,24 @@ public final class ImmutableGraph {
     }
 
     public long[] shortestPath(int from, int to, int maxHops) {
+        return search(from, to, maxHops, null);
+    }
+
+    public long[] shortestPathWithin(int from, int to, boolean[] allowed, int maxHops) {
+        if (from < 0 || to < 0 || !allowed[from] || !allowed[to]) return null;
+        return search(from, to, maxHops, allowed);
+    }
+
+    public boolean[] allowedMask(java.util.Collection<Long> ids) {
+        boolean[] mask = new boolean[idByIdx.length];
+        for (long id : ids) {
+            int idx = indexOf(id);
+            if (idx >= 0) mask[idx] = true;
+        }
+        return mask;
+    }
+
+    private long[] search(int from, int to, int maxHops, boolean[] allowed) {
         if (from == to) return new long[]{idByIdx[from]};
 
         int n = idByIdx.length;
@@ -81,6 +99,7 @@ public final class ImmutableGraph {
             for (int u : front) {
                 for (int e = offsets[u]; e < offsets[u + 1]; e++) {
                     int v = neighbors[e];
+                    if (allowed != null && !allowed[v]) continue;
                     if (dist[v] != -1) continue;
                     dist[v] = depth;
                     par[v] = u;
