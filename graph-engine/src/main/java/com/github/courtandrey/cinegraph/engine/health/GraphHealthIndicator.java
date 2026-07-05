@@ -26,6 +26,6 @@ public class GraphHealthIndicator implements HealthIndicator {
         if (graph != null) {
             builder.withDetail("nodes", graph.nodeCount()).withDetail("edges", graph.edgeCount());
         }
-        return builder.withDetail("state", holder.status().name()).build();
+        return builder.withDetail("state", holder.phase()).build();
     }
 }

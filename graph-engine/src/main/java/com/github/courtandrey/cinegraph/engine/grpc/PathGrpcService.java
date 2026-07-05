@@ -87,7 +87,7 @@ public class PathGrpcService extends PathServiceGrpc.PathServiceImplBase {
         boolean started = holder.triggerReload();
         responseObserver.onNext(ReloadReply.newBuilder()
                 .setStarted(started)
-                .setState(holder.status().name())
+                .setState(holder.phase())
                 .build());
         responseObserver.onCompleted();
     }

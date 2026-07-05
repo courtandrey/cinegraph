@@ -72,7 +72,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-cinegraph}
       DB_USER: ${DB_USER:-cinegraph}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-      JAVA_OPTS: ${ENGINE_JAVA_OPTS:--Xmx3g}
+      JAVA_OPTS: ${ENGINE_JAVA_OPTS:--Xmx512m}
       ENGINE_SNAPSHOT_PATH: /data/graph-snapshot.bin
     expose:
       - "8085"

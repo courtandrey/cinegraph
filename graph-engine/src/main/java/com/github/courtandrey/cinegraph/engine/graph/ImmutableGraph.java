@@ -1,15 +1,16 @@
 package com.github.courtandrey.cinegraph.engine.graph;
 
+import java.nio.IntBuffer;
 import java.util.Arrays;
 
 public final class ImmutableGraph {
 
     private final long[] idByIdx;
     private final int[] offsets;
-    private final int[] neighbors;
+    private final IntBuffer neighbors;
     private final int[] component;
 
-    public ImmutableGraph(long[] idByIdx, int[] offsets, int[] neighbors) {
+    public ImmutableGraph(long[] idByIdx, int[] offsets, IntBuffer neighbors) {
         this.idByIdx = idByIdx;
         this.offsets = offsets;
         this.neighbors = neighbors;
@@ -21,19 +22,7 @@ public final class ImmutableGraph {
     }
 
     public long edgeCount() {
-        return neighbors.length / 2L;
-    }
-
-    long[] ids() {
-        return idByIdx;
-    }
-
-    int[] offsets() {
-        return offsets;
-    }
-
-    int[] neighbors() {
-        return neighbors;
+        return neighbors.capacity() / 2L;
     }
 
     public int indexOf(long movieId) {
@@ -79,45 +68,53 @@ public final class ImmutableGraph {
         distF[from] = 0;
         distB[to] = 0;
 
-        int[] frontF = {from};
-        int[] frontB = {to};
+        int[] frontF = new int[n];
+        int[] frontB = new int[n];
+        int[] spare = new int[n];
+        frontF[0] = from;
+        frontB[0] = to;
+        int lenF = 1;
+        int lenB = 1;
         int dF = 0;
         int dB = 0;
         int best = Integer.MAX_VALUE;
         int meet = -1;
 
-        while (frontF.length > 0 && frontB.length > 0 && dF + dB < best && dF + dB < maxHops) {
-            boolean expandF = frontF.length <= frontB.length;
+        while (lenF > 0 && lenB > 0 && dF + dB < best && dF + dB < maxHops) {
+            boolean expandF = lenF <= lenB;
             int[] front = expandF ? frontF : frontB;
+            int len = expandF ? lenF : lenB;
             int[] dist = expandF ? distF : distB;
             int[] other = expandF ? distB : distF;
             int[] par = expandF ? parF : parB;
             int depth = (expandF ? dF : dB) + 1;
 
-            int[] next = new int[n];
             int count = 0;
-            for (int u : front) {
+            for (int i = 0; i < len; i++) {
+                int u = front[i];
                 for (int e = offsets[u]; e < offsets[u + 1]; e++) {
-                    int v = neighbors[e];
+                    int v = neighbors.get(e);
                     if (allowed != null && !allowed[v]) continue;
                     if (dist[v] != -1) continue;
                     dist[v] = depth;
                     par[v] = u;
-                    next[count++] = v;
+                    spare[count++] = v;
                     if (other[v] != -1 && depth + other[v] < best) {
                         best = depth + other[v];
                         meet = v;
                     }
                 }
             }
-            int[] trimmed = Arrays.copyOf(next, count);
             if (expandF) {
-                frontF = trimmed;
+                frontF = spare;
+                lenF = count;
                 dF = depth;
             } else {
-                frontB = trimmed;
+                frontB = spare;
+                lenB = count;
                 dB = depth;
             }
+            spare = front;
         }
 
         if (meet < 0) return null;
@@ -141,12 +138,12 @@ public final class ImmutableGraph {
         return out;
     }
 
-    private static int[] computeComponents(int n, int[] offsets, int[] neighbors) {
+    private static int[] computeComponents(int n, int[] offsets, IntBuffer neighbors) {
         int[] parent = new int[n];
         for (int i = 0; i < n; i++) parent[i] = i;
         for (int u = 0; u < n; u++) {
             for (int e = offsets[u]; e < offsets[u + 1]; e++) {
-                union(parent, u, neighbors[e]);
+                union(parent, u, neighbors.get(e));
             }
         }
         for (int i = 0; i < n; i++) parent[i] = find(parent, i);

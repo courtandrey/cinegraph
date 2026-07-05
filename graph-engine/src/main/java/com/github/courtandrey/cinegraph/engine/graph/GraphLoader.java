@@ -5,9 +5,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.UncheckedIOException;
+import java.nio.IntBuffer;
+import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 import static com.github.courtandrey.cinegraph.engine.jooq.Tables.EDGE;
 
@@ -22,36 +23,49 @@ public class GraphLoader {
         this.ctx = ctx;
     }
 
-    public ImmutableGraph load() {
+    public ImmutableGraph load(Path snapshotTarget) {
         long start = System.currentTimeMillis();
 
-        Map<Long, Integer> degree = new HashMap<>(1 << 21);
+        LongIntCounter degree = new LongIntCounter(1 << 21);
         scanEdges((a, b) -> {
-            degree.merge(a, 1, Integer::sum);
-            degree.merge(b, 1, Integer::sum);
+            degree.increment(a);
+            degree.increment(b);
         });
 
         log.info("[engine] calculated degrees in {} ms", System.currentTimeMillis() - start);
 
         int n = degree.size();
-        long[] idByIdx = degree.keySet().stream().mapToLong(Long::longValue).sorted().toArray();
+        long[] idByIdx = degree.sortedKeys();
         int[] offsets = new int[n + 1];
         for (int i = 0; i < n; i++) {
             offsets[i + 1] = offsets[i] + degree.get(idByIdx[i]);
         }
-        int[] neighbors = new int[offsets[n]];
         int[] cursor = offsets.clone();
 
-        scanEdges((a, b) -> {
-            int ia = Arrays.binarySearch(idByIdx, a);
-            int ib = Arrays.binarySearch(idByIdx, b);
-            neighbors[cursor[ia]++] = ib;
-            neighbors[cursor[ib]++] = ia;
-        });
+        GraphSnapshot.Builder builder;
+        try {
+            builder = GraphSnapshot.builder(snapshotTarget, idByIdx, offsets);
+        } catch (java.io.IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try {
+            IntBuffer neighbors = builder.neighbors();
+            scanEdges((a, b) -> {
+                int ia = Arrays.binarySearch(idByIdx, a);
+                int ib = Arrays.binarySearch(idByIdx, b);
+                neighbors.put(cursor[ia]++, ib);
+                neighbors.put(cursor[ib]++, ia);
+            });
+            builder.commit();
+        } catch (Exception e) {
+            builder.abort();
+            throw e instanceof RuntimeException re ? re : new IllegalStateException(e);
+        }
 
-        ImmutableGraph graph = new ImmutableGraph(idByIdx, offsets, neighbors);
-        log.info("[engine] loaded graph from db: {} nodes, {} edges in {} ms",
-                n, graph.edgeCount(), System.currentTimeMillis() - start);
+        ImmutableGraph graph = GraphSnapshot.read(snapshotTarget)
+                .orElseThrow(() -> new IllegalStateException("snapshot unreadable after build: " + snapshotTarget));
+        log.info("[engine] loaded graph from db: {} nodes, {} edges in {} ms; snapshot {}",
+                n, graph.edgeCount(), System.currentTimeMillis() - start, snapshotTarget);
         return graph;
     }
 

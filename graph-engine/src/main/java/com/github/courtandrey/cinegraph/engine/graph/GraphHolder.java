@@ -7,7 +7,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,8 +42,8 @@ public class GraphHolder {
         }
     }
 
-    public boolean startInitialLoad() {
-        return run("engine-graph-load", () -> GraphSnapshot.read(snapshotPath)
+    public void startInitialLoad() {
+        run("engine-graph-load", () -> GraphSnapshot.read(snapshotPath)
                 .map(g -> {
                     log.info("[engine] restored graph from snapshot {}: {} nodes, {} edges",
                             snapshotPath, g.nodeCount(), g.edgeCount());
@@ -59,34 +58,38 @@ public class GraphHolder {
 
     private ImmutableGraph computeAndSnapshot() {
         GraphSnapshot.delete(snapshotPath);
-        ImmutableGraph graph = loader.load();
-        try {
-            GraphSnapshot.write(snapshotPath, graph);
-            log.info("[engine] wrote graph snapshot to {}", snapshotPath);
-        } catch (IOException e) {
-            log.error("[engine] failed to write snapshot {}", snapshotPath, e);
-        }
-        return graph;
+        return loader.load(snapshotPath);
     }
 
     private boolean run(String threadName, Callable<ImmutableGraph> task) {
         if (!loading.compareAndSet(false, true)) {
             return false;
         }
-        ref.set(null);
-        status = Status.LOADING;
+        if (ref.get() == null) {
+            status = Status.LOADING;
+        }
         Thread.ofPlatform().name(threadName).start(() -> {
             try {
                 ref.set(task.call());
                 status = Status.READY;
             } catch (Exception e) {
-                log.error("[engine] graph load failed", e);
-                status = Status.FAILED;
+                ImmutableGraph previous = ref.get();
+                if (previous == null) {
+                    log.error("[engine] graph load failed", e);
+                    status = Status.FAILED;
+                } else {
+                    log.error("[engine] graph reload failed; keeping previous graph ({} nodes, {} edges)",
+                            previous.nodeCount(), previous.edgeCount(), e);
+                }
             } finally {
                 loading.set(false);
             }
         });
         return true;
+    }
+
+    public String phase() {
+        return loading.get() && ref.get() != null ? "RELOADING" : status.name();
     }
 
     public ImmutableGraph graph() {
