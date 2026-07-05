@@ -132,10 +132,10 @@ public class IncrementalLoadService {
             }
 
             syncState.setLastChangeSyncDate(today);
+            edgeBuildService.runIncrementalEdgesSync(runId);
+
             runRepo.finish(runId, RunStatus.COMPLETED, FetchPipeline.statsJson(stats));
             log.info("[run {}] Incremental load completed; stats={}", runId, FetchPipeline.statsJson(stats));
-
-            edgeBuildService.runIncrementalEdgesSync(runId);
         } catch (Exception e) {
             log.error("[run {}] Incremental load failed: {}", runId, e.getMessage(), e);
             runRepo.finish(runId, RunStatus.FAILED, "{}");

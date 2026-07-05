@@ -119,42 +119,31 @@ public class EdgeBuildService {
         boolean incremental = ingestRunId != null;
         log.info("[edge run {}] {} edge build started", runId, incremental ? "Incremental" : "Full");
         Stats stats = Stats.ZERO;
-        List<Long> dirtyIds = List.of();
         try {
             if (incremental) {
-                dirtyIds = ctx.select(DIRTY_MOVIE.MOVIE_ID).from(DIRTY_MOVIE)
+                List<Long> dirtyIds = ctx.select(DIRTY_MOVIE.MOVIE_ID).from(DIRTY_MOVIE)
                         .where(DIRTY_MOVIE.RUN_ID.eq(ingestRunId))
                         .fetch(DIRTY_MOVIE.MOVIE_ID);
                 if (dirtyIds.isEmpty()) {
                     runRepo.finish(runId, RunStatus.COMPLETED, "{\"dirty_ids\":0}");
                     return;
                 }
-                stats = stats.plusDeleted(deleteEdgesTouching(dirtyIds));
-                seedDirtyScope(dirtyIds);
+                stats = ctx.transactionResult(cfg -> rebuildDirtyAtomically(runId, dirtyIds, cancelKey));
             } else {
                 ctx.truncate(EDGE).execute();
+                stats = buildEdges(runId, false, cancelKey, Stats.ZERO);
             }
 
-            if (cancelled(cancelKey)) { runRepo.finish(runId, RunStatus.CANCELLED, stats.toJson()); return; }
-
-            buildScoredCredit(incremental);
-            stats = runPass1(runId, incremental, cancelKey, stats);
-            if (cancelled(cancelKey)) { runRepo.finish(runId, RunStatus.CANCELLED, stats.toJson()); return; }
-
-            mergeEdgeCrew();
-            cleanUpAfterEdgeCrewBuild();
-            runRepo.updateStats(runId, stats.phaseJson("edgeCrewMerged", 1, 1));
-            stats = runPass2(runId, incremental, cancelKey, stats);
-
-            if (!cancelled(cancelKey)) {
-                engineClient.triggerReload();
-            }
-
+            engineClient.triggerReload();
             runRepo.finish(runId, RunStatus.COMPLETED, stats.toJson());
             if (incremental) {
                 ctx.deleteFrom(DIRTY_MOVIE).where(DIRTY_MOVIE.RUN_ID.lt(ingestRunId)).execute();
             }
             log.info("[edge run {}] Edge build completed; {}", runId, stats.toJson());
+        } catch (BuildCancelled c) {
+            Stats reported = incremental ? Stats.ZERO : c.stats;
+            runRepo.finish(runId, RunStatus.CANCELLED, reported.toJson());
+            log.info("[edge run {}] Edge build cancelled{}", runId, incremental ? "; all changes rolled back" : "");
         } catch (Exception e) {
             log.error("[edge run {}] Edge build failed: {}", runId, e.getMessage(), e);
             runRepo.finish(runId, RunStatus.FAILED, stats.toJson());
@@ -163,8 +152,40 @@ public class EdgeBuildService {
         }
     }
 
+    private Stats rebuildDirtyAtomically(long runId, List<Long> dirtyIds, long cancelKey) {
+        Stats stats = Stats.ZERO.plusDeleted(deleteEdgesTouching(dirtyIds));
+        seedDirtyScope(dirtyIds);
+        return buildEdges(runId, true, cancelKey, stats);
+    }
+
+    private Stats buildEdges(long runId, boolean incremental, long cancelKey, Stats stats) {
+        ensureNotCancelled(cancelKey, stats);
+        buildScoredCredit(incremental);
+        stats = runPass1(runId, incremental, cancelKey, stats);
+        ensureNotCancelled(cancelKey, stats);
+        mergeEdgeCrew();
+        cleanUpAfterEdgeCrewBuild();
+        runRepo.updateStats(runId, stats.phaseJson("edgeCrewMerged", 1, 1));
+        stats = runPass2(runId, incremental, cancelKey, stats);
+        ensureNotCancelled(cancelKey, stats);
+        return stats;
+    }
+
+    private void ensureNotCancelled(long cancelKey, Stats stats) {
+        if (cancelled(cancelKey)) throw new BuildCancelled(stats);
+    }
+
     private boolean cancelled(long cancelKey) {
         return runRegistry.isCancelled(cancelKey);
+    }
+
+    private static final class BuildCancelled extends RuntimeException {
+        private final transient Stats stats;
+
+        private BuildCancelled(Stats stats) {
+            super("edge build cancelled", null, false, false);
+            this.stats = stats;
+        }
     }
 
     private void truncateScratch() {
