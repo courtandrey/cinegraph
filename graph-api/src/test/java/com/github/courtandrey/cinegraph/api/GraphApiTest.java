@@ -82,11 +82,20 @@ class GraphApiTest {
                 .andExpect(jsonPath("$", hasSize(0)));
     }
 
-    /**
-     * Verifies the search query can use the pg_trgm index (EXPLAIN output mentions it).
-     * On small datasets the planner may choose a seq-scan; we check the query is structurally
-     * valid and only assert the index when the table is large enough for the planner to care.
-     */
+    @Test
+    void search_wordPrefix_matchesMultiWordTitles() throws Exception {
+        mvc.perform(get("/api/movies/search").param("q", "Mat"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].title", hasItems("The Matrix", "The Matrix Reloaded")));
+    }
+
+    @Test
+    void search_typo_fallsBackToFuzzyMatch() throws Exception {
+        mvc.perform(get("/api/movies/search").param("q", "Matrx"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].title", hasItem("The Matrix")));
+    }
+
     @Test
     void search_explainUsesTrgmIndex() throws Exception {
         for (int i = 1; i <= 500; i++) {
@@ -100,7 +109,6 @@ class GraphApiTest {
                 "WHERE title ILIKE 'Fi%' OR title % 'Film' OR original_title % 'Film' " +
                 "ORDER BY (title ILIKE 'Fi%') DESC, similarity(title, 'Film') DESC, " +
                 "popularity DESC NULLS LAST LIMIT 10", String.class));
-        // The plan must be non-null; either index or seq-scan is acceptable but query is valid
         assertThat(plan).isNotNull();
     }
 

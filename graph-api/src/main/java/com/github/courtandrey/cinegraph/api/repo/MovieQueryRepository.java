@@ -4,8 +4,8 @@ import com.github.courtandrey.cinegraph.api.dto.GraphNode;
 import com.github.courtandrey.cinegraph.api.dto.LetterboxdSearchResult;
 import com.github.courtandrey.cinegraph.api.dto.MovieDetail;
 import com.github.courtandrey.cinegraph.api.dto.SearchResult;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
-import org.jooq.Field;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -16,7 +16,6 @@ import static com.github.courtandrey.cinegraph.api.jooq.Tables.GENRE;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.LETTERBOXD_SET;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.MOVIE;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.MOVIE_GENRE;
-import static org.jooq.impl.DSL.inline;
 import static org.jooq.impl.DSL.lower;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
@@ -25,6 +24,7 @@ import static org.jooq.impl.DSL.select;
 public class MovieQueryRepository {
 
     private static final int MAX_SEARCH = 50;
+    private static final double FUZZY_THRESHOLD = 0.35;
 
     private final DSLContext ctx;
 
@@ -38,20 +38,46 @@ public class MovieQueryRepository {
 
     public List<SearchResult> search(String q, int limit, Collection<Long> subset) {
         if (subset != null && subset.isEmpty()) return List.of();
-        Field<String> pattern = inline(q).concat(inline("%"));
-        var prefixMatch = Pg.ilike(MOVIE.TITLE, pattern);
-        var textMatch = prefixMatch
-                .or(Pg.wordSimilar(MOVIE.TITLE, q))
-                .or(Pg.wordSimilar(MOVIE.ORIGINAL_TITLE, q));
+        String tsQuery = Pg.tsQuery(q);
+        if (tsQuery.isEmpty()) return List.of();
+        int cap = Math.min(limit, MAX_SEARCH);
 
-        return ctx.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.RELEASE_YEAR, MOVIE.POSTER_PATH)
+        List<SearchResult> primary =
+                fetchMovies(ctx, Pg.ftsMatch(MOVIE.TITLE, MOVIE.ORIGINAL_TITLE, tsQuery), subset, cap);
+        if (!primary.isEmpty()) return primary;
+
+        return ctx.transactionResult(cfg -> {
+            Pg.setWordSimilarityThreshold(cfg.dsl(), FUZZY_THRESHOLD);
+            return fetchMovies(cfg.dsl(), fuzzyMatch(q), subset, cap);
+        });
+    }
+
+    public List<LetterboxdSearchResult> searchInSet(String q, int limit, String hash) {
+        String tsQuery = Pg.tsQuery(q);
+        if (tsQuery.isEmpty()) return List.of();
+        int cap = Math.min(limit, MAX_SEARCH);
+
+        List<LetterboxdSearchResult> primary =
+                fetchSetMovies(ctx, Pg.ftsMatch(MOVIE.TITLE, MOVIE.ORIGINAL_TITLE, tsQuery), hash, cap);
+        if (!primary.isEmpty()) return primary;
+
+        return ctx.transactionResult(cfg -> {
+            Pg.setWordSimilarityThreshold(cfg.dsl(), FUZZY_THRESHOLD);
+            return fetchSetMovies(cfg.dsl(), fuzzyMatch(q), hash, cap);
+        });
+    }
+
+    private static Condition fuzzyMatch(String q) {
+        return Pg.wordSimilarTo(q, MOVIE.TITLE).or(Pg.wordSimilarTo(q, MOVIE.ORIGINAL_TITLE));
+    }
+
+    private static List<SearchResult> fetchMovies(DSLContext dsl, Condition match,
+                                                  Collection<Long> subset, int cap) {
+        return dsl.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.RELEASE_YEAR, MOVIE.POSTER_PATH)
                 .from(MOVIE)
-                .where(subset == null ? textMatch : textMatch.and(MOVIE.MOVIE_ID.in(subset)))
-                .orderBy(
-                        org.jooq.impl.DSL.field(prefixMatch).desc(),
-                        Pg.similarity(MOVIE.TITLE, q).desc(),
-                        MOVIE.POPULARITY.desc().nullsLast())
-                .limit(Math.min(limit, MAX_SEARCH))
+                .where(subset == null ? match : match.and(MOVIE.MOVIE_ID.in(subset)))
+                .orderBy(MOVIE.POPULARITY.desc().nullsLast())
+                .limit(cap)
                 .fetch(r -> new SearchResult(
                         r.value1(),
                         r.value2(),
@@ -59,23 +85,15 @@ public class MovieQueryRepository {
                         r.value4()));
     }
 
-    public List<LetterboxdSearchResult> searchInSet(String q, int limit, String hash) {
-        Field<String> pattern = inline(q).concat(inline("%"));
-        var prefixMatch = Pg.ilike(MOVIE.TITLE, pattern);
-        var textMatch = prefixMatch
-                .or(Pg.wordSimilar(MOVIE.TITLE, q))
-                .or(Pg.wordSimilar(MOVIE.ORIGINAL_TITLE, q));
-
-        return ctx.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.RELEASE_YEAR,
+    private static List<LetterboxdSearchResult> fetchSetMovies(DSLContext dsl, Condition match,
+                                                               String hash, int cap) {
+        return dsl.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.RELEASE_YEAR,
                         MOVIE.POSTER_PATH, LETTERBOXD_SET.GRAPH_ID)
                 .from(MOVIE)
                 .join(LETTERBOXD_SET).on(LETTERBOXD_SET.MOVIE_ID.eq(MOVIE.MOVIE_ID))
-                .where(LETTERBOXD_SET.HASH.eq(hash).and(textMatch))
-                .orderBy(
-                        org.jooq.impl.DSL.field(prefixMatch).desc(),
-                        Pg.similarity(MOVIE.TITLE, q).desc(),
-                        MOVIE.POPULARITY.desc().nullsLast())
-                .limit(Math.min(limit, MAX_SEARCH))
+                .where(LETTERBOXD_SET.HASH.eq(hash).and(match))
+                .orderBy(MOVIE.POPULARITY.desc().nullsLast())
+                .limit(cap)
                 .fetch(r -> new LetterboxdSearchResult(
                         r.value1(),
                         r.value2(),

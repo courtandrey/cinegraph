@@ -195,7 +195,7 @@ triggered manually via `POST /admin/incremental`.
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/movies/search?q=&limit=` | Typeahead search (prefix + trigram similarity) |
+| `GET /api/movies/search?q=&limit=` | Typeahead search: per-word prefix full-text match ranked by popularity, with a trigram word-similarity fallback for typos |
 | `GET /api/movies/{id}` | Movie detail (title, year, genres, runtime, overview, …) |
 | `GET /api/movies/{id}/graph?minScore=&limit=` | Graph payload from stored scores: center + top-N neighbors + inter-neighbor edges (each edge carries its score components) |
 | `POST /api/movies/{id}/reweight` | Re-score all edges touching the center with custom weights (body `{limit, weights, minScore}`), return the new top-N |
