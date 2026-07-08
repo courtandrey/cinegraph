@@ -64,6 +64,14 @@ public class LetterboxdController {
         return ResponseEntity.ok(service.search(hash, q.trim(), Math.min(limit, 50)));
     }
 
+    @GetMapping("/{hash}/recommendations")
+    public ResponseEntity<?> recommendations(@PathVariable String hash,
+                                             @RequestParam(required = false) Long graphId,
+                                             @RequestParam(defaultValue = "false") boolean invert,
+                                             @RequestParam(defaultValue = "25") int limit) {
+        return ResponseEntity.ok(service.recommendations(hash, graphId, invert, limit));
+    }
+
     @GetMapping("/{hash}/path")
     public ResponseEntity<?> path(@PathVariable String hash,
                                   @RequestParam long from,

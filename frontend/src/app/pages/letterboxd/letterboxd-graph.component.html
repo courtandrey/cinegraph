@@ -36,7 +36,7 @@
 
       @if (store.count() > 0) {
         <div class="bottom-controls">
-          <button class="find-btn" (click)="openSearch()" aria-label="Find a film" title="Find a film">
+          <button class="find-btn" (click)="openSearch()" aria-label="Find a film">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="7"></circle>
@@ -49,8 +49,14 @@
               <span class="counter">{{ store.index() + 1 }}/{{ store.count() }}</span>
               <button class="arrow" (click)="next()" [disabled]="store.index() === store.count() - 1" aria-label="Next graph">→</button>
             </div>
-            <div class="find-spacer" aria-hidden="true"></div>
           }
+          <button class="find-btn recs-btn" (click)="openRecs()" aria-label="Recommendations">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path>
+              <path d="M18.5 15.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"></path>
+            </svg>
+          </button>
         </div>
       }
 
@@ -61,6 +67,58 @@
       }
     </div>
 
+    @if (recsOpen()) {
+      <aside class="side-panel recs-panel" [class.inverted]="recsInvert()">
+        <button class="panel-collapse" (click)="recsOpen.set(false)">▾ Collapse</button>
+
+        <div class="detail-scroll">
+          <div class="recs-head">
+            <span class="recs-summary">{{ recsInvert() ? 'Least recommended' : 'Top recommendations' }}</span>
+            <button class="invert-btn" [class.active]="recsInvert()" (click)="toggleInvert()"
+                    [attr.aria-pressed]="recsInvert()" aria-label="Invert recommendations"
+                    title="Invert — show the least recommended">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 4v14M7 18l-3-3M7 18l3-3"></path>
+                <path d="M17 20V6M17 6l-3 3M17 6l3 3"></path>
+              </svg>
+            </button>
+          </div>
+          @if (store.count() > 1) {
+            <div class="recs-scope" role="group" aria-label="Recommendation scope">
+              <button class="scope-btn" [class.active]="recsScope() === 'all'"
+                      (click)="setRecsScope('all')">All films</button>
+              <button class="scope-btn" [class.active]="recsScope() === 'component'"
+                      (click)="setRecsScope('component')">This graph</button>
+            </div>
+          }
+          @if (recs(); as list) {
+            @if (list.length === 0) {
+              <div class="recs-empty">{{ recsInvert() ? 'No films to rank were found.' : 'No film with a positive recommendation score was found.' }}</div>
+            } @else {
+              <ol class="rec-list">
+                @for (r of list; track r.id; let i = $index) {
+                  <li class="rec-row" (click)="onRecTap(r)">
+                    <span class="rec-rank">{{ i + 1 }}</span>
+                    @if (posterW92(r.posterPath); as src) {
+                      <img class="chain-thumb" [src]="src" [alt]="r.title" />
+                    } @else {
+                      <div class="chain-thumb chain-thumb--empty"></div>
+                    }
+                    <span class="chain-title">{{ r.title }}@if (r.year) { <span class="chain-year">{{ r.year }}</span> }</span>
+                    <span class="rec-score">{{ r.inScore.toFixed(0) }}</span>
+                  </li>
+                }
+              </ol>
+            }
+          } @else if (recsStatus() === 'error') {
+            <div class="recs-empty">Could not load recommendations. Try again.</div>
+          } @else {
+            <div class="recs-empty">Scoring films similar to yours…</div>
+          }
+        </div>
+      </aside>
+    } @else {
     @if (path(); as pv) {
       <aside class="side-panel path-panel">
         <button class="panel-collapse path-collapse" (click)="pathSheetOpen.set(false)">▾ Collapse</button>
@@ -85,12 +143,16 @@
         </div>
 
         <div class="panel-footer">
-          <button class="dismiss-btn" (click)="dismissPath()">DISMISS PATH</button>
+          <button class="dismiss-btn" (click)="dismissPathToSource()">{{ pathReturn() ? 'Back' : 'DISMISS PATH' }}</button>
         </div>
       </aside>
     } @else if (selectedNodeId() !== null) {
       <aside class="side-panel">
-      <button class="panel-collapse" (click)="onClearSelection()">▾ Collapse</button>
+      @if (detailReturn() === 'recs') {
+        <button class="panel-collapse" (click)="backToRecs()">← Back to recommendations</button>
+      } @else {
+        <button class="panel-collapse" (click)="onClearSelection()">▾ Collapse</button>
+      }
 
       @if (selectedDetail(); as m) {
         <div class="detail-scroll">
@@ -104,7 +166,7 @@
           @if (m.year) { <div class="detail-year">{{ m.year }}</div> }
 
           <div class="inscore-row">
-            <span class="inscore-label">Total in-score</span>
+            <span class="inscore-label">{{ selectedScoreLabel() }}</span>
             <span class="inscore-value">{{ selectedInScore().toFixed(1) }}</span>
           </div>
 
@@ -135,11 +197,14 @@
 
       <div class="panel-footer">
         <div class="footer-btns">
-          <button class="find-path-btn" (click)="openPathSearch()">FIND PATH</button>
+          @if (!isRecommendation()) {
+            <button class="find-path-btn" (click)="openPathSearch()">FIND PATH</button>
+          }
           <button class="deep-dive-btn" (click)="deepDive()">DEEP DIVE</button>
         </div>
       </div>
     </aside>
+    }
     }
   </div>
 

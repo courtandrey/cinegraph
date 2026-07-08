@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GraphCanvasComponent } from '../graph/graph-canvas/graph-canvas.component';
 import { LetterboxdSearchComponent } from './letterboxd-search/letterboxd-search.component';
@@ -12,6 +12,8 @@ interface PathView {
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
+
+type DetailReturn = 'recs' | null;
 
 const POSTER_W342 = 'https://image.tmdb.org/t/p/w342';
 const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
@@ -42,6 +44,17 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly path = signal<PathView | null>(null);
   readonly pathSheetOpen = signal(false);
   readonly pathNodeIds = computed(() => this.path()?.nodes.map(n => n.id) ?? null);
+
+  readonly recsOpen = signal(false);
+  readonly recs = signal<GraphNode[] | null>(null);
+  readonly recsStatus = signal<'idle' | 'loading' | 'error'>('idle');
+  readonly recsScope = signal<'all' | 'component'>('all');
+  readonly recsInvert = signal(false);
+  private recsKey: string | null = null;
+  private recsSeq = 0;
+
+  readonly detailReturn = signal<DetailReturn>(null);
+  readonly pathReturn = signal<{ nodeId: number; detailReturn: DetailReturn } | null>(null);
 
   private thresholdTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -78,12 +91,52 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   readonly centerId = computed(() => this.payload()?.center.id ?? 0);
 
-  readonly selectedInScore = computed(() => {
-    const id = this.selectedNodeId();
-    return id == null ? 0 : (this.inScoreById().get(id) ?? 0);
+  readonly recScoreById = computed(() => {
+    const map = new Map<number, number>();
+    for (const r of this.recs() ?? []) map.set(r.id, r.inScore);
+    return map;
   });
 
+  readonly selectedInScore = computed(() => {
+    const id = this.selectedNodeId();
+    if (id == null) return 0;
+    return this.inScoreById().get(id) ?? this.recScoreById().get(id) ?? 0;
+  });
+
+  readonly isRecommendation = computed(() => {
+    const id = this.selectedNodeId();
+    return id != null && !this.inScoreById().has(id) && this.recScoreById().has(id);
+  });
+
+  readonly selectedScoreLabel = computed(() =>
+    this.isRecommendation() ? 'Recommendation score' : 'Total in-score');
+
   private detailSeq = 0;
+
+  constructor() {
+    effect(() => {
+      if (!this.recsOpen()) return;
+      const scope = this.recsScope();
+      const invert = this.recsInvert();
+      const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
+      untracked(() => this.ensureRecs(scope, graphId, invert));
+    });
+  }
+
+  private ensureRecs(scope: 'all' | 'component', graphId: number | null, invert: boolean): void {
+    const key = `${scope}:${graphId ?? ''}:${invert}`;
+    if (this.recsKey === key && (this.recs() !== null || this.recsStatus() === 'loading')) return;
+    const hash = this.store.hash();
+    if (!hash) return;
+    this.recsKey = key;
+    this.recs.set(null);
+    this.recsStatus.set('loading');
+    const seq = ++this.recsSeq;
+    this.api.letterboxdRecommendations(hash, 25, graphId ?? undefined, invert).subscribe({
+      next: list => { if (seq === this.recsSeq) { this.recs.set(list); this.recsStatus.set('idle'); } },
+      error: () => { if (seq === this.recsSeq) this.recsStatus.set('error'); }
+    });
+  }
 
   ngOnInit(): void {
     const hash = this.route.snapshot.paramMap.get('hash');
@@ -107,6 +160,8 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   onNodeTap(id: number): void {
     if (this.path()) this.dismissPath();
+    this.recsOpen.set(false);
+    this.detailReturn.set(null);
     this.selectedNodeId.set(id);
     this.selectedDetail.set(null);
     const seq = ++this.detailSeq;
@@ -146,6 +201,29 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   openSearch(): void {
     this.searchOpen.set(true);
+  }
+
+  openRecs(): void {
+    if (this.path()) this.dismissPath();
+    this.onClearSelection();
+    this.recsOpen.set(true);
+  }
+
+  setRecsScope(scope: 'all' | 'component'): void {
+    this.recsScope.set(scope);
+  }
+
+  toggleInvert(): void {
+    this.recsInvert.update(v => !v);
+  }
+
+  onRecTap(rec: GraphNode): void {
+    this.onNodeTap(rec.id);
+    this.detailReturn.set('recs');
+  }
+
+  backToRecs(): void {
+    this.openRecs();
   }
 
   onSearchPick(sel: { movieId: number; graphId: number }): void {
@@ -221,12 +299,14 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     const sourceId = this.selectedNodeId();
     const hash = this.store.hash();
     if (sourceId == null || !hash || sourceId === targetId) return;
+    const from = { nodeId: sourceId, detailReturn: this.detailReturn() };
     this.api.letterboxdPath(hash, sourceId, targetId).subscribe({
       next: res => {
         if (!res.found || res.nodes.length < 2) return;
         this.store.mergeManyIntoCurrent(res.nodes, res.edges);
         this.forceReveal(res.nodes.map(n => n.id));
         this.onClearSelection();
+        this.pathReturn.set(from);
         this.path.set({ nodes: res.nodes, edges: res.edges });
         this.pathSheetOpen.set(false);
       }
@@ -236,6 +316,16 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   dismissPath(): void {
     this.path.set(null);
     this.pathSheetOpen.set(false);
+    this.pathReturn.set(null);
+  }
+
+  dismissPathToSource(): void {
+    const ret = this.pathReturn();
+    this.dismissPath();
+    if (ret) {
+      this.onNodeTap(ret.nodeId);
+      this.detailReturn.set(ret.detailReturn);
+    }
   }
 
   prev(): void {

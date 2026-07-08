@@ -110,6 +110,7 @@
 
 .find-btn {
   pointer-events: auto;
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -128,11 +129,30 @@
   }
 
   &:hover { filter: brightness(1.08); }
+
+  &::after {
+    content: attr(aria-label);
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 9px;
+    background: $panel;
+    border: 1px solid $border;
+    border-radius: 4px;
+    color: $text-bright;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &:hover::after { opacity: 1; }
 }
 
-.find-spacer {
-  flex: 0 0 auto;
-  width: 46px;
+.recs-btn {
+  background: $accent-blue;
+  color: #06202e;
 }
 
 .graph-switcher {
@@ -316,20 +336,38 @@
   padding: 12px 14px;
 }
 
-.deep-dive-btn {
+.deep-dive-btn,
+.find-path-btn,
+.dismiss-btn {
   width: 100%;
   padding: 10px;
-  background: $accent-green;
-  border: none;
   border-radius: 3px;
-  color: #06140a;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.06em;
   cursor: pointer;
   font-family: inherit;
+}
+
+.deep-dive-btn,
+.dismiss-btn {
+  border: none;
 
   &:hover { filter: brightness(1.08); }
+}
+
+.deep-dive-btn { background: $accent-green; color: #06140a; }
+.dismiss-btn { background: $accent-orange; color: #1a0d00; }
+
+.find-path-btn {
+  background: transparent;
+  border: 1px solid $border;
+  color: $text;
+
+  &:hover {
+    border-color: $accent-orange;
+    color: $accent-orange;
+  }
 }
 
 .footer-btns {
@@ -340,50 +378,57 @@
   .find-path-btn { flex: 1; }
 }
 
-.find-path-btn {
-  width: 100%;
-  padding: 10px;
-  background: transparent;
-  border: 1px solid $border;
-  border-radius: 3px;
-  color: $text;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  font-family: inherit;
-
-  &:hover {
-    border-color: $accent-orange;
-    color: $accent-orange;
-  }
-}
-
-.path-summary {
-  color: $accent-orange;
+.path-summary,
+.recs-summary {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.path-summary { color: $accent-orange; margin-bottom: 8px; }
+.recs-summary { color: var(--rec-accent); }
+
+.recs-panel { --rec-accent: #{$accent-blue}; }
+.recs-panel.inverted { --rec-accent: #f0533a; }
+
+.recs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 8px;
 }
 
-.chain {
+.invert-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 3px;
+
+  svg { width: 17px; height: 17px; }
+
+  &:hover,
+  &.active { color: var(--rec-accent); }
+}
+
+.chain,
+.rec-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.chain-node {
+.chain-node,
+.rec-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px;
   border-radius: 3px;
   cursor: pointer;
 
   &:hover { background: $panel-2; }
 }
+
+.chain-node { gap: 12px; padding: 6px; }
+.rec-row { gap: 10px; margin: 0 -8px; padding: 6px 8px; }
 
 .chain-thumb {
   width: 38px;
@@ -413,20 +458,66 @@
   padding: 4px 0 4px 50px;
 }
 
-.dismiss-btn {
-  width: 100%;
-  padding: 10px;
-  background: $accent-orange;
+.recs-scope {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 3px;
+  background: $panel-2;
+  border: 1px solid $border;
+  border-radius: 5px;
+}
+
+.scope-btn,
+.invert-btn {
+  background: none;
   border: none;
-  border-radius: 3px;
-  color: #1a0d00;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  color: $text;
   cursor: pointer;
+}
+
+.scope-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
   font-family: inherit;
 
-  &:hover { filter: brightness(1.08); }
+  &.active {
+    background: var(--rec-accent);
+    color: #10151a;
+  }
+}
+
+.recs-empty {
+  color: $text;
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+.rec-rank,
+.rec-score {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.rec-rank {
+  color: $text;
+  font-size: 12px;
+  min-width: 20px;
+  text-align: right;
+}
+
+.rec-row .chain-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-score {
+  color: var(--rec-accent);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .path-collapse { display: none; }

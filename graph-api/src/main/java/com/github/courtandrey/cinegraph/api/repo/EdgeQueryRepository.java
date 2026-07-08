@@ -3,8 +3,11 @@ package com.github.courtandrey.cinegraph.api.repo;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vavr.control.Try;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.JSONB;
+import org.jooq.Table;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -12,6 +15,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.EDGE;
+import static com.github.courtandrey.cinegraph.api.jooq.Tables.LETTERBOXD_SET;
+import static org.jooq.impl.DSL.noCondition;
+import static org.jooq.impl.DSL.selectOne;
+import static org.jooq.impl.DSL.sum;
+import static org.jooq.impl.DSL.when;
 
 @Repository
 public class EdgeQueryRepository {
@@ -21,6 +29,8 @@ public class EdgeQueryRepository {
 
     public record RawEdge(long movieA, long movieB,
                           float totalScore, float crewScore, JsonNode components) {}
+
+    public record Recommendation(long movieId, double score) {}
 
     private static final int INTER_NEIGHBOR_LIMIT = 300;
 
@@ -114,6 +124,46 @@ public class EdgeQueryRepository {
                         r.get(EDGE.MOVIE_B),
                         r.get(EDGE.TOTAL_SCORE),
                         text(r.get(EDGE.COMPONENTS))));
+    }
+
+    public List<Recommendation> topRecommendations(String hash, Long graphId, boolean invert, int limit) {
+        var rated = LETTERBOXD_SET.as("rated");
+        var owned = LETTERBOXD_SET.as("owned");
+        Condition scope = graphId == null ? noCondition() : rated.GRAPH_ID.eq(graphId);
+        Field<Double> contribution = EDGE.TOTAL_SCORE.cast(Double.class)
+                .mul(ratingCoef(rated.RATING)).as("contribution");
+
+        var fromA = ctx.select(EDGE.MOVIE_B.as("rec_id"), contribution)
+                .from(EDGE)
+                .join(rated).on(rated.HASH.eq(hash).and(rated.MOVIE_ID.eq(EDGE.MOVIE_A)).and(scope))
+                .whereNotExists(selectOne().from(owned)
+                        .where(owned.HASH.eq(hash).and(owned.MOVIE_ID.eq(EDGE.MOVIE_B))));
+        var fromB = ctx.select(EDGE.MOVIE_A.as("rec_id"), contribution)
+                .from(EDGE)
+                .join(rated).on(rated.HASH.eq(hash).and(rated.MOVIE_ID.eq(EDGE.MOVIE_B)).and(scope))
+                .whereNotExists(selectOne().from(owned)
+                        .where(owned.HASH.eq(hash).and(owned.MOVIE_ID.eq(EDGE.MOVIE_A))));
+
+        Table<?> contrib = fromA.unionAll(fromB).asTable("contrib");
+        Field<Long> recId = contrib.field("rec_id", Long.class);
+        Field<Double> score = sum(contrib.field("contribution", Double.class)).cast(Double.class);
+
+        // Normal: only films the set actually recommends (positive score), best first.
+        // Inverted: the least recommended across every candidate — no positivity guard.
+        var grouped = ctx.select(recId, score.as("score"))
+                .from(contrib)
+                .groupBy(recId)
+                .having(invert ? noCondition() : score.gt(0.0));
+        return (invert ? grouped.orderBy(score.asc()) : grouped.orderBy(score.desc()))
+                .limit(limit)
+                .fetch(r -> new Recommendation(
+                        r.get("rec_id", Long.class),
+                        r.get("score", Double.class)));
+    }
+
+    private static Field<Double> ratingCoef(Field<Float> rating) {
+        return when(rating.isNull(), 1.0)
+                .otherwise(rating.cast(Double.class).minus(2.5).mul(4.0).plus(1.0));
     }
 
     public Optional<RawEdge> findEdge(long idA, long idB) {

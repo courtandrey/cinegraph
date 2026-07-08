@@ -45,7 +45,7 @@ class GraphApiTest {
     @BeforeEach
     void seed() {
         jdbc.execute("TRUNCATE movie, person, credit, genre, keyword, " +
-                     "movie_genre, movie_keyword, edge CASCADE");
+                     "movie_genre, movie_keyword, edge, letterboxd_set CASCADE");
         insertFixture();
     }
 
@@ -203,6 +203,103 @@ class GraphApiTest {
     void edgeBreakdown_noEdge_returns404() throws Exception {
         mvc.perform(get("/api/edges/603/999999"))
                 .andExpect(status().isNotFound());
+    }
+
+    // ── letterboxd recommendations ────────────────────────────────────────────
+
+    @Test
+    void recommendations_ranksByRatingWeightedInScore_excludingSetMembers() throws Exception {
+        insertRecommendationFixture();
+        mvc.perform(get("/api/letterboxd/recs/recommendations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(4)))
+                .andExpect(jsonPath("$[*].id", contains(700, 701, 100, 702)))
+                .andExpect(jsonPath("$[0].title").value("John Wick"))
+                .andExpect(jsonPath("$[0].inScore", closeTo(110.0, 1e-4)))
+                .andExpect(jsonPath("$[1].inScore", closeTo(60.0, 1e-4)))
+                .andExpect(jsonPath("$[2].inScore", closeTo(55.0, 1e-4)))
+                .andExpect(jsonPath("$[3].inScore", closeTo(10.0, 1e-4)));
+    }
+
+    @Test
+    void recommendations_limitCapsResults() throws Exception {
+        insertRecommendationFixture();
+        mvc.perform(get("/api/letterboxd/recs/recommendations").param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[*].id", contains(700, 701)));
+    }
+
+    @Test
+    void recommendations_unknownHash_returnsEmptyList() throws Exception {
+        mvc.perform(get("/api/letterboxd/nosuchhash/recommendations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void recommendations_scopedToComponent_usesOnlyThatComponentsFilms() throws Exception {
+        insertRecommendationFixture();
+        // 603 (5★) and 605 (unrated) form component 900; 604 (1★) is in component 901.
+        jdbc.update("UPDATE letterboxd_set SET graph_id = 900 WHERE hash='recs' AND movie_id IN (603, 605)");
+        jdbc.update("UPDATE letterboxd_set SET graph_id = 901 WHERE hash='recs' AND movie_id = 604");
+
+        // Scoped to 900: only 603/605 seed, but the whole set is still excluded (800 gone).
+        mvc.perform(get("/api/letterboxd/recs/recommendations").param("graphId", "900"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(4)))
+                .andExpect(jsonPath("$[*].id", containsInAnyOrder(700, 701, 100, 702)))
+                .andExpect(jsonPath("$[*].id", not(hasItem(800))));
+
+        // Scoped to 901: only 604 (1★ → negative coefficient) seeds, so nothing clears the guard.
+        mvc.perform(get("/api/letterboxd/recs/recommendations").param("graphId", "901"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void recommendations_inverted_returnsLeastRecommendedAcrossAllCandidates() throws Exception {
+        insertRecommendationFixture();
+        // Inverted keeps every candidate (positives included), lowest score first — unlike the
+        // default direction which drops the negative 800 and orders best-first.
+        mvc.perform(get("/api/letterboxd/recs/recommendations").param("invert", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(5)))
+                .andExpect(jsonPath("$[*].id", contains(800, 702, 100, 701, 700)))
+                .andExpect(jsonPath("$[0].title").value("Jupiter Ascending"))
+                .andExpect(jsonPath("$[0].inScore", closeTo(-50.0, 1e-4)))
+                .andExpect(jsonPath("$[4].inScore", closeTo(110.0, 1e-4)));
+    }
+
+    private void insertRecommendationFixture() {
+        insertMovie(605, "Bound", 1996);
+        insertMovie(100, "Dark City", 1998);
+        insertMovie(700, "John Wick", 2014);
+        insertMovie(701, "Speed", 1994);
+        insertMovie(702, "Cloud Atlas", 2012);
+        insertMovie(800, "Jupiter Ascending", 2015);
+
+        // coef: 603 rated 5.0 -> 11, 604 rated 1.0 -> -5, 605 unrated -> 1
+        insertSetEntry("recs", 603, 5.0f);
+        insertSetEntry("recs", 604, 1.0f);
+        insertSetEntry("recs", 605, null);
+
+        insertScoreOnlyEdge(603, 700, 10f);
+        insertScoreOnlyEdge(603, 701, 10f);
+        insertScoreOnlyEdge(604, 701, 10f);
+        insertScoreOnlyEdge(100, 603, 5f);
+        insertScoreOnlyEdge(605, 702, 10f);
+        insertScoreOnlyEdge(604, 800, 10f);
+    }
+
+    private void insertSetEntry(String hash, long movieId, Float rating) {
+        jdbc.update("INSERT INTO letterboxd_set (hash, movie_id, rating) VALUES (?, ?, ?)",
+                hash, movieId, rating);
+    }
+
+    private void insertScoreOnlyEdge(long a, long b, float score) {
+        jdbc.update("INSERT INTO edge (movie_a, movie_b, total_score, crew_score, components) " +
+                    "VALUES (?, ?, ?, ?, '[]'::jsonb)", a, b, score, score);
     }
 
     // ── CORS ──────────────────────────────────────────────────────────────────

@@ -92,6 +92,20 @@ public class LetterboxdGraphService {
         return movieRepo.searchInSet(q, limit, hash);
     }
 
+    public List<GraphNode> recommendations(String hash, Long graphId, boolean invert, int limitReq) {
+        int limit = Math.clamp(limitReq, 1, MAX_LIMIT);
+        List<EdgeQueryRepository.Recommendation> recs = edgeRepo.topRecommendations(hash, graphId, invert, limit);
+        Map<Long, GraphNode> nodeById = movieRepo
+                .findNodesByIds(recs.stream().map(EdgeQueryRepository.Recommendation::movieId).toList())
+                .stream()
+                .collect(Collectors.toMap(GraphNode::id, Function.identity()));
+        return recs.stream()
+                .map(r -> Optional.ofNullable(nodeById.get(r.movieId()))
+                        .map(n -> n.withInScore(r.score())))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
     public Optional<LetterboxdAttachment> attachNode(
             String hash, long movieId, java.util.Collection<Long> visibleIds) {
         List<Long> subset = setRepo.loadMovieIds(hash);
@@ -229,8 +243,6 @@ public class LetterboxdGraphService {
         List<Built> built = new ArrayList<>();
         Map<Long, Long> graphIdByMovie = new HashMap<>();
         for (Graphs.Component comp : Graphs.components(edges)) {
-            // In-score reflects the whole persisted component, not the capped view — a node's
-            // score must include edges to films that were dropped for rendering performance.
             Map<Long, Double> inScore = Graphs.edgeSums(comp.edges());
             Graphs.Component withNodes = Graphs.capNodes(comp, props.getMaxGraphNodes());
             Graphs.Component view = Graphs.capEdgesPerNode(
