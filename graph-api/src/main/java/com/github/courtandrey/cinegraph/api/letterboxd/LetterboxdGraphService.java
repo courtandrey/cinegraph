@@ -106,6 +106,30 @@ public class LetterboxdGraphService {
                 .toList();
     }
 
+    public Optional<RecommendationBreakdown> recommendationBreakdown(String hash, long movieId) {
+        if (setRepo.contains(hash, movieId)) return Optional.empty();
+        List<EdgeQueryRepository.SetEdge> edges = edgeRepo.recommendationContributions(hash, movieId);
+        if (edges.isEmpty()) return Optional.empty();
+
+        List<RecommendationBreakdown.Contribution> contributions = edges.stream()
+                .map(e -> {
+                    double coef = ratingCoef(e.rating());
+                    return new RecommendationBreakdown.Contribution(
+                            e.setMovieId(), e.inScore(), e.rating(), coef, e.inScore() * coef);
+                })
+                .sorted(Comparator.comparingDouble(
+                        RecommendationBreakdown.Contribution::contribution).reversed())
+                .toList();
+        double total = contributions.stream()
+                .mapToDouble(RecommendationBreakdown.Contribution::contribution).sum();
+        return Optional.of(new RecommendationBreakdown(movieId, total, contributions));
+    }
+
+    /** Mirrors the SQL {@code ratingCoef} in EdgeQueryRepository — keep the two in sync. */
+    private static double ratingCoef(Double rating) {
+        return rating == null ? 1.0 : 1.0 + (rating - 2.5) * 4.0;
+    }
+
     public Optional<LetterboxdAttachment> attachNode(
             String hash, long movieId, java.util.Collection<Long> visibleIds) {
         List<Long> subset = setRepo.loadMovieIds(hash);
@@ -131,16 +155,22 @@ public class LetterboxdGraphService {
 
     public Optional<GraphPayload> recenter(String hash, long movieId, float minScore, int limit) {
         return movieRepo.findById(movieId).map(center -> {
-            List<Long> subset = setRepo.loadMovieIds(hash);
             int cap = Math.clamp(limit, 1, MAX_LIMIT);
 
-            List<NeighborEdge> neighborEdges = edgeRepo.findNeighborEdgesAmong(movieId, subset, minScore, cap);
+            // A recommendation centre is ranked by contribution to its rec-score, with no score
+            // floor; a film from the user's own set keeps the by-in-score, min-score-filtered view.
+            boolean recommendation = !setRepo.contains(hash, movieId);
+            List<NeighborEdge> neighborEdges = recommendation
+                    ? edgeRepo.findNeighborEdgesByContribution(movieId, hash, cap)
+                    : edgeRepo.findNeighborEdgesAmong(movieId, setRepo.loadMovieIds(hash), minScore, cap);
+            float interMinScore = recommendation ? 0f : minScore;
+
             List<Long> neighborIds = neighborEdges.stream().map(NeighborEdge::neighborId).toList();
             List<GraphNode> nodes = movieRepo.findNodesByIds(neighborIds);
 
             List<GraphEdge> edges = new ArrayList<>();
             neighborEdges.forEach(e -> edges.add(toGraphEdge(e)));
-            edgeRepo.findInterNeighborEdges(neighborIds, minScore).forEach(e -> edges.add(toGraphEdge(e)));
+            edgeRepo.findInterNeighborEdges(neighborIds, interMinScore).forEach(e -> edges.add(toGraphEdge(e)));
 
             return new GraphPayload(center, nodes, edges);
         });

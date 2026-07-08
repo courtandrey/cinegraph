@@ -72,6 +72,14 @@ public class LetterboxdController {
         return ResponseEntity.ok(service.recommendations(hash, graphId, invert, limit));
     }
 
+    @GetMapping("/{hash}/recommendations/{movieId}/breakdown")
+    public ResponseEntity<?> recommendationBreakdown(@PathVariable String hash,
+                                                     @PathVariable long movieId) {
+        return service.recommendationBreakdown(hash, movieId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> notFound(movieId));
+    }
+
     @GetMapping("/{hash}/path")
     public ResponseEntity<?> path(@PathVariable String hash,
                                   @RequestParam long from,

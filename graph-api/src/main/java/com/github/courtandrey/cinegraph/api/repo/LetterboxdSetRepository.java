@@ -24,6 +24,11 @@ public class LetterboxdSetRepository {
         return ctx.fetchExists(selectOne().from(LETTERBOXD_SET).where(LETTERBOXD_SET.HASH.eq(hash)));
     }
 
+    public boolean contains(String hash, long movieId) {
+        return ctx.fetchExists(selectOne().from(LETTERBOXD_SET)
+                .where(LETTERBOXD_SET.HASH.eq(hash).and(LETTERBOXD_SET.MOVIE_ID.eq(movieId))));
+    }
+
     public List<Long> loadMovieIds(String hash) {
         return ctx.select(LETTERBOXD_SET.MOVIE_ID)
                 .from(LETTERBOXD_SET)

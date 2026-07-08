@@ -32,6 +32,8 @@ public class EdgeQueryRepository {
 
     public record Recommendation(long movieId, double score) {}
 
+    public record SetEdge(long setMovieId, double inScore, Double rating) {}
+
     private static final int INTER_NEIGHBOR_LIMIT = 300;
 
     private final DSLContext ctx;
@@ -112,6 +114,35 @@ public class EdgeQueryRepository {
                         text(r.get(EDGE.COMPONENTS))));
     }
 
+    public List<NeighborEdge> findNeighborEdgesByContribution(long recId, String hash, int limit) {
+        var rated = LETTERBOXD_SET.as("rated");
+        Field<Double> contribution = EDGE.TOTAL_SCORE.cast(Double.class)
+                .mul(ratingCoef(rated.RATING)).as("contribution");
+
+        var fromA = ctx.select(EDGE.MOVIE_B.as("neighbor_id"), EDGE.MOVIE_A, EDGE.MOVIE_B,
+                        EDGE.TOTAL_SCORE, EDGE.COMPONENTS, contribution)
+                .from(EDGE)
+                .join(rated).on(rated.HASH.eq(hash).and(rated.MOVIE_ID.eq(EDGE.MOVIE_B)))
+                .where(EDGE.MOVIE_A.eq(recId));
+        var fromB = ctx.select(EDGE.MOVIE_A.as("neighbor_id"), EDGE.MOVIE_A, EDGE.MOVIE_B,
+                        EDGE.TOTAL_SCORE, EDGE.COMPONENTS, contribution)
+                .from(EDGE)
+                .join(rated).on(rated.HASH.eq(hash).and(rated.MOVIE_ID.eq(EDGE.MOVIE_A)))
+                .where(EDGE.MOVIE_B.eq(recId));
+
+        Table<?> nbr = fromA.unionAll(fromB).asTable("nbr");
+        return ctx.select(nbr.fields())
+                .from(nbr)
+                .orderBy(nbr.field("contribution", Double.class).desc())
+                .limit(limit)
+                .fetch(r -> new NeighborEdge(
+                        r.get("neighbor_id", Long.class),
+                        r.get("movie_a", Long.class),
+                        r.get("movie_b", Long.class),
+                        r.get("total_score", Float.class),
+                        text(r.get("components", JSONB.class))));
+    }
+
     public List<NeighborEdge> findEdgesAmong(List<Long> ids) {
         if (ids.size() < 2) return List.of();
         return ctx.select(EDGE.MOVIE_A, EDGE.MOVIE_B, EDGE.TOTAL_SCORE, EDGE.COMPONENTS)
@@ -148,13 +179,11 @@ public class EdgeQueryRepository {
         Field<Long> recId = contrib.field("rec_id", Long.class);
         Field<Double> score = sum(contrib.field("contribution", Double.class)).cast(Double.class);
 
-        // Normal: only films the set actually recommends (positive score), best first.
-        // Inverted: the least recommended across every candidate — no positivity guard.
         var grouped = ctx.select(recId, score.as("score"))
                 .from(contrib)
                 .groupBy(recId)
                 .having(invert ? noCondition() : score.gt(0.0));
-        return (invert ? grouped.orderBy(score.asc()) : grouped.orderBy(score.desc()))
+        return grouped.orderBy(invert ? score.asc() : score.desc())
                 .limit(limit)
                 .fetch(r -> new Recommendation(
                         r.get("rec_id", Long.class),
@@ -164,6 +193,23 @@ public class EdgeQueryRepository {
     private static Field<Double> ratingCoef(Field<Float> rating) {
         return when(rating.isNull(), 1.0)
                 .otherwise(rating.cast(Double.class).minus(2.5).mul(4.0).plus(1.0));
+    }
+
+    public List<SetEdge> recommendationContributions(String hash, long recId) {
+        var rated = LETTERBOXD_SET.as("rated");
+        var fromA = ctx.select(EDGE.MOVIE_B.as("set_id"), EDGE.TOTAL_SCORE.as("in_score"), rated.RATING)
+                .from(EDGE)
+                .join(rated).on(rated.HASH.eq(hash).and(rated.MOVIE_ID.eq(EDGE.MOVIE_B)))
+                .where(EDGE.MOVIE_A.eq(recId));
+        var fromB = ctx.select(EDGE.MOVIE_A.as("set_id"), EDGE.TOTAL_SCORE.as("in_score"), rated.RATING)
+                .from(EDGE)
+                .join(rated).on(rated.HASH.eq(hash).and(rated.MOVIE_ID.eq(EDGE.MOVIE_A)))
+                .where(EDGE.MOVIE_B.eq(recId));
+        return fromA.unionAll(fromB)
+                .fetch(r -> new SetEdge(
+                        r.get("set_id", Long.class),
+                        r.get("in_score", Double.class),
+                        r.get("rating", Double.class)));
     }
 
     public Optional<RawEdge> findEdge(long idA, long idB) {

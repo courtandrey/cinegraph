@@ -91,6 +91,111 @@
   line-height: 1;
 }
 
+/* Recommendation deep-dive: per-film in-score × coef = contribution */
+.rec-calc {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.rec-term {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  padding: 6px 4px;
+  background: $panel-2;
+  border: 1px solid $border;
+  border-radius: 4px;
+}
+
+.rec-term-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: $text;
+  white-space: nowrap;
+}
+
+.rec-term-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: $text-bright;
+  font-variant-numeric: tabular-nums;
+}
+
+.rec-op {
+  align-self: center;
+  color: $text;
+  font-size: 13px;
+}
+
+.rec-term--result {
+  border-color: $accent-green;
+
+  .rec-term-val { color: $accent-green; }
+}
+
+.rec-term--coef {
+  position: relative;
+  cursor: help;
+
+  .rec-term-label { border-bottom: 1px dotted $text; }
+
+  &::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 200px;
+    padding: 5px 9px;
+    background: $panel;
+    border: 1px solid $border;
+    border-radius: 4px;
+    color: $text-bright;
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  &:hover::after,
+  &:focus::after { opacity: 1; }
+}
+
+.rec-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 8px 10px;
+  background: $panel-2;
+  border: 1px solid $accent-green;
+  border-radius: 4px;
+}
+
+.rec-total-label {
+  color: $text;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rec-total-value {
+  color: $accent-green;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 .breakdown-list {
   list-style: none;
   flex: 1;

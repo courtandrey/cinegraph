@@ -101,3 +101,17 @@ export interface EdgeBreakdown {
   crewScore: number;
   components: EdgeComponent[];
 }
+
+export interface RecommendationContribution {
+  movieId: number;
+  inScore: number;
+  rating: number | null;
+  coef: number;
+  contribution: number;
+}
+
+export interface RecommendationBreakdown {
+  movieId: number;
+  total: number;
+  contributions: RecommendationContribution[];
+}

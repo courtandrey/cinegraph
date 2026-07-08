@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MovieSummary, MovieDetail, GraphPayload, GraphNode, EdgeBreakdown, RoleWeight, LetterboxdGraph, LetterboxdUploadResponse, LetterboxdSearchResult, LetterboxdAttachment, PathResult } from '../models/movie.model';
+import { MovieSummary, MovieDetail, GraphPayload, GraphNode, EdgeBreakdown, RoleWeight, LetterboxdGraph, LetterboxdUploadResponse, LetterboxdSearchResult, LetterboxdAttachment, PathResult, RecommendationBreakdown } from '../models/movie.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -66,6 +66,11 @@ export class MovieApiService {
     if (graphId != null) params['graphId'] = graphId.toString();
     if (invert) params['invert'] = 'true';
     return this.http.get<GraphNode[]>(`${this.base}/letterboxd/${hash}/recommendations`, { params });
+  }
+
+  letterboxdRecommendationBreakdown(hash: string, movieId: number) {
+    return this.http.get<RecommendationBreakdown>(
+      `${this.base}/letterboxd/${hash}/recommendations/${movieId}/breakdown`);
   }
 
   letterboxdPath(hash: string, from: number, to: number) {

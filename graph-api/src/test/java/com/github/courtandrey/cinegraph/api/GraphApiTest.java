@@ -17,6 +17,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -269,6 +270,93 @@ class GraphApiTest {
                 .andExpect(jsonPath("$[0].title").value("Jupiter Ascending"))
                 .andExpect(jsonPath("$[0].inScore", closeTo(-50.0, 1e-4)))
                 .andExpect(jsonPath("$[4].inScore", closeTo(110.0, 1e-4)));
+    }
+
+    @Test
+    void recommendationBreakdown_showsInScoreTimesCoefPerFilmAndTotal() throws Exception {
+        insertRecommendationFixture();
+        // 701 links to 603 (5★ → coef 11, edge 10 → 110) and 604 (1★ → coef −5, edge 10 → −50).
+        mvc.perform(get("/api/letterboxd/recs/recommendations/701/breakdown"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movieId").value(701))
+                .andExpect(jsonPath("$.total", closeTo(60.0, 1e-4)))
+                .andExpect(jsonPath("$.contributions", hasSize(2)))
+                .andExpect(jsonPath("$.contributions[0].movieId").value(603))
+                .andExpect(jsonPath("$.contributions[0].inScore", closeTo(10.0, 1e-4)))
+                .andExpect(jsonPath("$.contributions[0].rating", closeTo(5.0, 1e-4)))
+                .andExpect(jsonPath("$.contributions[0].coef", closeTo(11.0, 1e-4)))
+                .andExpect(jsonPath("$.contributions[0].contribution", closeTo(110.0, 1e-4)))
+                .andExpect(jsonPath("$.contributions[1].movieId").value(604))
+                .andExpect(jsonPath("$.contributions[1].contribution", closeTo(-50.0, 1e-4)));
+    }
+
+    @Test
+    void recommendationBreakdown_unratedFilmUsesCoefOne() throws Exception {
+        insertRecommendationFixture();
+        // 702 links only to 605 (unrated → coef 1, edge 10 → 10).
+        mvc.perform(get("/api/letterboxd/recs/recommendations/702/breakdown"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total", closeTo(10.0, 1e-4)))
+                .andExpect(jsonPath("$.contributions", hasSize(1)))
+                .andExpect(jsonPath("$.contributions[0].rating").doesNotExist())
+                .andExpect(jsonPath("$.contributions[0].coef", closeTo(1.0, 1e-4)));
+    }
+
+    @Test
+    void recommendationBreakdown_setMember_returns404() throws Exception {
+        insertRecommendationFixture();
+        mvc.perform(get("/api/letterboxd/recs/recommendations/603/breakdown"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void recenter_recommendation_ranksNeighboursByContributionNotInScore() throws Exception {
+        insertRecommendationFixture();
+        insertMovie(710, "Contribution Test", 2020);
+        insertScoreOnlyEdge(603, 710, 5f);    // 603 is 5★ → coef 11 → contribution 55
+        insertScoreOnlyEdge(605, 710, 20f);   // 605 unrated → coef 1 → contribution 20
+
+        // 605 has the higher in-score (20 vs 5) but 603 the higher contribution (55 vs 20);
+        // capping to one neighbour must keep 603, proving selection is by contribution.
+        mvc.perform(post("/api/letterboxd/recenter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hash\":\"recs\",\"movieId\":710,\"minScore\":0,\"limit\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.center.id").value(710))
+                .andExpect(jsonPath("$.nodes", hasSize(1)))
+                .andExpect(jsonPath("$.nodes[0].id").value(603));
+    }
+
+    @Test
+    void recenter_recommendation_ignoresMinScore() throws Exception {
+        insertRecommendationFixture();
+        insertMovie(710, "Contribution Test", 2020);
+        insertScoreOnlyEdge(603, 710, 5f);
+
+        // A min-score of 9999 would drop this edge in the normal view; the rec view keeps it.
+        mvc.perform(post("/api/letterboxd/recenter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hash\":\"recs\",\"movieId\":710,\"minScore\":9999,\"limit\":40}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes", hasSize(greaterThanOrEqualTo(1))));
+    }
+
+    @Test
+    void recenter_setMember_stillFiltersByMinScore() throws Exception {
+        insertRecommendationFixture();   // seed edge (603,604) links two set films
+
+        // A set-film centre keeps the normal min-score filter: low floor shows the neighbour…
+        mvc.perform(post("/api/letterboxd/recenter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hash\":\"recs\",\"movieId\":603,\"minScore\":0,\"limit\":40}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes[*].id", hasItem(604)));
+        // …a high floor drops it.
+        mvc.perform(post("/api/letterboxd/recenter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hash\":\"recs\",\"movieId\":603,\"minScore\":9999,\"limit\":40}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes", hasSize(0)));
     }
 
     private void insertRecommendationFixture() {

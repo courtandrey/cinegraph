@@ -42,6 +42,7 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
   @Input() focus: { id: number } | null = null;
   @Input() pathNodeIds: number[] | null = null;
   @Input() pathRightInset = 0;
+  @Input() nodeSortScore: Map<number, number> | null = null;
 
   @Output() nodeTap = new EventEmitter<number>();
   @Output() clearSelection = new EventEmitter<void>();
@@ -84,6 +85,15 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
       this.pendingPath = true;
       if (!rebuilt) this.runPendingPath();
     }
+    if (changes['nodeSortScore'] && !rebuilt) this.relayout();
+  }
+
+  private relayout(): void {
+    if (!this.cy) return;
+    this.ngZone.runOutsideAngular(() => {
+      const layout = this.cy!.layout(this.buildLayout(false) as any);
+      layout.run();
+    });
   }
 
   hideTooltip(): void {
@@ -534,7 +544,9 @@ export class GraphCanvasComponent implements AfterViewInit, OnChanges, OnDestroy
     const edges = this.graph?.edges ?? [];
 
     const scoreByNode = new Map<number, number>();
-    if (this.layoutByInScore) {
+    if (this.nodeSortScore) {
+      for (const n of this.graph?.nodes ?? []) scoreByNode.set(n.id, this.nodeSortScore.get(n.id) ?? 0);
+    } else if (this.layoutByInScore) {
       for (const n of this.graph?.nodes ?? []) scoreByNode.set(n.id, n.inScore ?? 0);
     } else {
       for (const e of edges) {

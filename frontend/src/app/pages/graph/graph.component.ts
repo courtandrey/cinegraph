@@ -8,7 +8,7 @@ import { PathModalComponent } from './path-modal/path-modal.component';
 import { MovieApiService } from '../../services/movie-api.service';
 import { GraphStore } from '../../services/graph-store.service';
 import { crewScoreOf, rolesInGraph, COMPONENT_DEFAULTS } from '../../services/graph-scoring';
-import { GraphPayload, GraphNode, MovieDetail, EdgeBreakdown, RoleWeight } from '../../models/movie.model';
+import { GraphPayload, GraphNode, MovieDetail, EdgeBreakdown, RoleWeight, RecommendationBreakdown, RecommendationContribution } from '../../models/movie.model';
 
 @Component({
   selector: 'app-graph',
@@ -36,6 +36,28 @@ export class GraphComponent implements OnInit, OnDestroy {
   readonly defaultWeights = signal<ReadonlyMap<string, number>>(new Map());
   readonly minScoreDisplay = signal(this.store.minScore());
   private minScoreTimer: ReturnType<typeof setTimeout> | null = null;
+
+  readonly recBreakdown = signal<RecommendationBreakdown | null>(null);
+  private recRequestSeq = 0;
+
+  readonly recContribById = computed(() => {
+    const map = new Map<number, RecommendationContribution>();
+    for (const c of this.recBreakdown()?.contributions ?? []) map.set(c.movieId, c);
+    return map;
+  });
+
+  readonly contributionScoreById = computed<Map<number, number> | null>(() => {
+    const bd = this.recBreakdown();
+    if (!bd) return null;
+    const map = new Map<number, number>();
+    for (const c of bd.contributions) map.set(c.movieId, c.contribution);
+    return map;
+  });
+
+  readonly selectedContribution = computed<RecommendationContribution | null>(() => {
+    const id = this.selectedNodeId();
+    return id == null ? null : (this.recContribById().get(id) ?? null);
+  });
 
   readonly limitOptions = [25, 40, 75, 100];
 
@@ -97,6 +119,7 @@ export class GraphComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.selectedNodeId.set(null);
     this.selectedBreakdown.set(null);
+    this.fetchRecBreakdown(id);
 
     const weights = this.store.customWeights();
     const hash = this.hash();
@@ -124,6 +147,17 @@ export class GraphComponent implements OnInit, OnDestroy {
       error: () => {
         if (seq === this.graphRequestSeq) this.loading.set(false);
       }
+    });
+  }
+
+  private fetchRecBreakdown(id: number): void {
+    const hash = this.hash();
+    const seq = ++this.recRequestSeq;
+    this.recBreakdown.set(null);
+    if (!hash) return;
+    this.api.letterboxdRecommendationBreakdown(hash, id).subscribe({
+      next: bd => { if (seq === this.recRequestSeq) this.recBreakdown.set(bd); },
+      error: () => { if (seq === this.recRequestSeq) this.recBreakdown.set(null); }
     });
   }
 

@@ -9,16 +9,18 @@
         <button class="back-btn" (click)="exit()">{{ hash() ? 'My graph' : 'Search' }}</button>
       </div>
       <div class="controls">
-        <span class="control-group">
-          <span class="control-label">MIN SCORE</span>
-          <input
-            type="range" min="0" [max]="maxScore()" step="1"
-            [value]="minScoreDisplay()"
-            (input)="onMinScoreInput(+$any($event.target).value)"
-            class="slider"
-          />
-          <span class="control-value">{{ minScoreDisplay() }}</span>
-        </span>
+        @if (!recBreakdown()) {
+          <span class="control-group">
+            <span class="control-label">MIN SCORE</span>
+            <input
+              type="range" min="0" [max]="maxScore()" step="1"
+              [value]="minScoreDisplay()"
+              (input)="onMinScoreInput(+$any($event.target).value)"
+              class="slider"
+            />
+            <span class="control-value">{{ minScoreDisplay() }}</span>
+          </span>
+        }
         <span class="control-group">
           <span class="control-label">LIMIT</span>
           <select
@@ -58,6 +60,7 @@
           [centerId]="centerId()"
           [minScore]="store.minScore()"
           [selectedNodeId]="selectedNodeId()"
+          [nodeSortScore]="contributionScoreById()"
           (nodeTap)="onNodeTap($event)"
           (clearSelection)="onClearSelection()"
         />
@@ -90,6 +93,8 @@
       [selectedNodeId]="selectedNodeId()"
       [weightsActive]="weightsActive()"
       [pathEnabled]="!hash()"
+      [recTotal]="recBreakdown()?.total ?? null"
+      [recContribution]="selectedContribution()"
       (reCenter)="onReCenter($event)"
       (backToCenter)="onClearSelection()"
       (adjustWeights)="onAdjustWeights()"

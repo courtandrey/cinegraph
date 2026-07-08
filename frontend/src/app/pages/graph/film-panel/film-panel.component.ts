@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, computed, signal } from '@angular/core';
-import { GraphPayload, EdgeBreakdown, EdgeComponent, MovieDetail } from '../../../models/movie.model';
+import { GraphPayload, EdgeBreakdown, EdgeComponent, MovieDetail, RecommendationContribution } from '../../../models/movie.model';
 
 const POSTER_W342 = 'https://image.tmdb.org/t/p/w342';
 const POSTER_W92  = 'https://image.tmdb.org/t/p/w92';
@@ -16,6 +16,14 @@ export class FilmPanelComponent {
   @Input() selectedNodeId: number | null = null;
   @Input() weightsActive = false;
   @Input() pathEnabled = false;
+  @Input() recTotal: number | null = null;
+  @Input() recContribution: RecommendationContribution | null = null;
+
+  get coefTooltip(): string {
+    return this.recContribution?.rating == null
+      ? 'Unrated film → coefficient 1'
+      : 'coefficient = 1 + (rating − 2.5) × 4';
+  }
 
   @Output() reCenter = new EventEmitter<number>();
   @Output() backToCenter = new EventEmitter<void>();
