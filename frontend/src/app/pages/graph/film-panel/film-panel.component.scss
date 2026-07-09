@@ -136,6 +136,12 @@
   border-color: $accent-green;
 
   .rec-term-val { color: $accent-green; }
+
+  &.negative {
+    border-color: $accent-red;
+
+    .rec-term-val { color: $accent-red; }
+  }
 }
 
 .rec-term--coef {
@@ -179,6 +185,12 @@
   background: $panel-2;
   border: 1px solid $accent-green;
   border-radius: 4px;
+
+  &.negative {
+    border-color: $accent-red;
+
+    .rec-total-value { color: $accent-red; }
+  }
 }
 
 .rec-total-label {

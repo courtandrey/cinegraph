@@ -49,8 +49,9 @@ export class GraphComponent implements OnInit, OnDestroy {
   readonly contributionScoreById = computed<Map<number, number> | null>(() => {
     const bd = this.recBreakdown();
     if (!bd) return null;
+    const notRecommended = bd.total < 0;
     const map = new Map<number, number>();
-    for (const c of bd.contributions) map.set(c.movieId, c.contribution);
+    for (const c of bd.contributions) map.set(c.movieId, notRecommended ? -c.contribution : c.contribution);
     return map;
   });
 

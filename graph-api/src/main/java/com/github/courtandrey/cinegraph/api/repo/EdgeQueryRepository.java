@@ -114,7 +114,8 @@ public class EdgeQueryRepository {
                         text(r.get(EDGE.COMPONENTS))));
     }
 
-    public List<NeighborEdge> findNeighborEdgesByContribution(long recId, String hash, int limit) {
+    public List<NeighborEdge> findNeighborEdgesByContribution(long recId, String hash,
+                                                              boolean ascending, int limit) {
         var rated = LETTERBOXD_SET.as("rated");
         Field<Double> contribution = EDGE.TOTAL_SCORE.cast(Double.class)
                 .mul(ratingCoef(rated.RATING)).as("contribution");
@@ -131,9 +132,10 @@ public class EdgeQueryRepository {
                 .where(EDGE.MOVIE_B.eq(recId));
 
         Table<?> nbr = fromA.unionAll(fromB).asTable("nbr");
+        Field<Double> ordered = nbr.field("contribution", Double.class);
         return ctx.select(nbr.fields())
                 .from(nbr)
-                .orderBy(nbr.field("contribution", Double.class).desc())
+                .orderBy(ascending ? ordered.asc() : ordered.desc())
                 .limit(limit)
                 .fetch(r -> new NeighborEdge(
                         r.get("neighbor_id", Long.class),

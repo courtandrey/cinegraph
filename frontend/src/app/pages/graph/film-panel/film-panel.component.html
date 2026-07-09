@@ -19,7 +19,7 @@
     </div>
 
     @if (recContribution; as rc) {
-      <div class="section-header">WHY RECOMMENDED</div>
+      <div class="section-header">{{ rc.contribution < 0 ? 'WHY NOT RECOMMENDED' : 'WHY RECOMMENDED' }}</div>
       <div class="rec-calc">
         <span class="rec-term">
           <span class="rec-term-label">In-score</span>
@@ -31,7 +31,7 @@
           <span class="rec-term-val">{{ rc.coef.toFixed(2) }}</span>
         </span>
         <span class="rec-op">=</span>
-        <span class="rec-term rec-term--result">
+        <span class="rec-term rec-term--result" [class.negative]="rc.contribution < 0">
           <span class="rec-term-label">Contribution</span>
           <span class="rec-term-val">{{ rc.contribution.toFixed(1) }}</span>
         </span>
@@ -83,7 +83,7 @@
         }
 
         @if (recTotal != null) {
-          <div class="rec-total-row">
+          <div class="rec-total-row" [class.negative]="recTotal < 0">
             <span class="rec-total-label">Recommendation score</span>
             <span class="rec-total-value">{{ recTotal.toFixed(1) }}</span>
           </div>

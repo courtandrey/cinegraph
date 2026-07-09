@@ -167,7 +167,7 @@
 
           <div class="inscore-row">
             <span class="inscore-label">{{ selectedScoreLabel() }}</span>
-            <span class="inscore-value">{{ selectedInScore().toFixed(1) }}</span>
+            <span class="inscore-value" [class.negative]="selectedInScore() < 0">{{ selectedInScore().toFixed(1) }}</span>
           </div>
 
           @if (m.genres.length > 0) {

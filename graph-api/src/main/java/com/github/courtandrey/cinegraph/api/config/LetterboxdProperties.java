@@ -12,8 +12,8 @@ public class LetterboxdProperties {
             + "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
     private int maxGraphNodes = 500;
     private int minGraphNodes = 1;
-    private int minEdgesPerNode = 5;
-    private float minScoreForNonEssential = 12f;
+    private int minEdgesPerNode = 3;
+    private float minScoreForNonEssential = 24f;
 
     public String getUserAgent()       { return userAgent; }
     public void setUserAgent(String v) { this.userAgent = v; }

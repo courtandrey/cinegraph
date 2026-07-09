@@ -328,6 +328,23 @@ class GraphApiTest {
     }
 
     @Test
+    void recenter_notRecommended_leadsWithMostNegativeContributor() throws Exception {
+        insertRecommendationFixture();
+        insertMovie(711, "Not Recommended", 2021);
+        insertScoreOnlyEdge(603, 711, 1f);    // 5★ → coef 11 → contribution +11
+        insertScoreOnlyEdge(604, 711, 10f);   // 1★ → coef −5 → contribution −50 (total −39 < 0)
+
+        // Net-negative total, so the deep-dive leads with the most negative contributor (604),
+        // not the positive one (603) that a by-contribution-desc order would surface.
+        mvc.perform(post("/api/letterboxd/recenter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"hash\":\"recs\",\"movieId\":711,\"minScore\":0,\"limit\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes", hasSize(1)))
+                .andExpect(jsonPath("$.nodes[0].id").value(604));
+    }
+
+    @Test
     void recenter_recommendation_ignoresMinScore() throws Exception {
         insertRecommendationFixture();
         insertMovie(710, "Contribution Test", 2020);

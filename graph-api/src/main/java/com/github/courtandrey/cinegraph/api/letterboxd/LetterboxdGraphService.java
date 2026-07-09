@@ -130,6 +130,12 @@ public class LetterboxdGraphService {
         return rating == null ? 1.0 : 1.0 + (rating - 2.5) * 4.0;
     }
 
+    private double recommendationTotal(String hash, long movieId) {
+        return edgeRepo.recommendationContributions(hash, movieId).stream()
+                .mapToDouble(e -> e.inScore() * ratingCoef(e.rating()))
+                .sum();
+    }
+
     public Optional<LetterboxdAttachment> attachNode(
             String hash, long movieId, java.util.Collection<Long> visibleIds) {
         List<Long> subset = setRepo.loadMovieIds(hash);
@@ -157,11 +163,10 @@ public class LetterboxdGraphService {
         return movieRepo.findById(movieId).map(center -> {
             int cap = Math.clamp(limit, 1, MAX_LIMIT);
 
-            // A recommendation centre is ranked by contribution to its rec-score, with no score
-            // floor; a film from the user's own set keeps the by-in-score, min-score-filtered view.
             boolean recommendation = !setRepo.contains(hash, movieId);
+            boolean leastFirst = recommendation && recommendationTotal(hash, movieId) < 0;
             List<NeighborEdge> neighborEdges = recommendation
-                    ? edgeRepo.findNeighborEdgesByContribution(movieId, hash, cap)
+                    ? edgeRepo.findNeighborEdgesByContribution(movieId, hash, leastFirst, cap)
                     : edgeRepo.findNeighborEdgesAmong(movieId, setRepo.loadMovieIds(hash), minScore, cap);
             float interMinScore = recommendation ? 0f : minScore;
 
