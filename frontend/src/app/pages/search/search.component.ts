@@ -24,8 +24,8 @@ export class SearchComponent implements OnInit {
 
   ngOnInit(): void {
     this.seo.apply({
-      title: 'CineGraph — Interactive Movie Similarity Graph & Letterboxd Recommendations',
-      description: 'Explore an interactive graph of 1.1M+ films connected by shared directors, writers, cinematographers and cast. Find movies like your favorites, get Letterboxd recommendations, and trace the shortest path between any two films.',
+      title: 'CineGraph — Movie Similarity Graph & Recommendations',
+      description: 'Explore a graph of 1M+ films linked by shared cast and crew. Find similar movies, get Letterboxd recommendations, and trace paths between films.',
       canonicalPath: '/',
       jsonLd: {
         '@context': 'https://schema.org',

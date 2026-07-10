@@ -63,8 +63,8 @@ export class PathPageComponent implements OnInit {
     const last = res.nodes[res.nodes.length - 1];
     const chain = res.nodes.map(n => n.title).join(' → ');
     this.seo.apply({
-      title: `How ${first.title} connects to ${last.title} — movie path | CineGraph`,
-      description: `The shortest path from ${withYear(first)} to ${withYear(last)} through shared crew and cast: ${chain}.`,
+      title: clamp(`How ${first.title} connects to ${last.title} | CineGraph`, 60),
+      description: clamp(`The shortest path from ${withYear(first)} to ${withYear(last)} through shared crew and cast: ${chain}.`, 155),
       canonicalPath: `/path/${from}/${to}`,
       image: first.posterPath ? this.posterUrl(first.posterPath, 'w500') : null
     });
@@ -87,4 +87,8 @@ export class PathPageComponent implements OnInit {
 
 function withYear(node: GraphNode): string {
   return node.year ? `${node.title} (${node.year})` : node.title;
+}
+
+function clamp(text: string, max: number): string {
+  return text.length <= max ? text : text.slice(0, max - 1).trimEnd() + '…';
 }

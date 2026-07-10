@@ -156,20 +156,19 @@ export class GraphComponent implements OnInit, OnDestroy {
 
   private applySeo(center: MovieDetail): void {
     const year = center.year ? ` (${center.year})` : '';
-    const overview = center.overview
-      ? ' ' + (center.overview.length > 120 ? center.overview.slice(0, 117).trimEnd() + '…' : center.overview)
-      : '';
     if (this.hash()) {
       this.seo.apply({
-        title: `${center.title}${year} — your Letterboxd graph | CineGraph`,
+        title: clamp(`${center.title}${year} — your Letterboxd graph | CineGraph`, 60),
         description: `Personal recommendation graph around ${center.title}${year}, built from your Letterboxd ratings.`,
         noindex: true
       });
       return;
     }
+    const base = `Movies similar to ${center.title}${year}, ranked by shared directors, writers, cinematographers and cast.`;
+    const overview = center.overview ? ` ${center.overview}` : '';
     this.seo.apply({
-      title: `Movies like ${center.title}${year} — similarity graph | CineGraph`,
-      description: `Discover movies similar to ${center.title}${year}, connected through shared directors, writers, cinematographers and cast.${overview}`,
+      title: clamp(`Movies like ${center.title}${year} | CineGraph`, 60),
+      description: clamp(base + overview, 155),
       canonicalPath: `/film/${center.id}`,
       image: center.posterPath ? `https://image.tmdb.org/t/p/w500${center.posterPath}` : null,
       jsonLd: {
@@ -305,6 +304,10 @@ export class GraphComponent implements OnInit, OnDestroy {
       components: [...edge.components].sort((a, b) => b.score - a.score)
     };
   }
+}
+
+function clamp(text: string, max: number): string {
+  return text.length <= max ? text : text.slice(0, max - 1).trimEnd() + '…';
 }
 
 function toWeightMap(roles: RoleWeight[]): ReadonlyMap<string, number> {
