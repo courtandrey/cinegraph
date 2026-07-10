@@ -12,6 +12,11 @@ export const routes: Routes = [
       import('./pages/graph/graph.component').then(m => m.GraphComponent)
   },
   {
+    path: 'path/:from/:to',
+    loadComponent: () =>
+      import('./pages/path/path-page.component').then(m => m.PathPageComponent)
+  },
+  {
     path: 'letterboxd/:hash/film/:id',
     loadComponent: () =>
       import('./pages/graph/graph.component').then(m => m.GraphComponent)

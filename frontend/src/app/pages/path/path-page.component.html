@@ -1,0 +1,51 @@
+<div class="path-page">
+  <header class="toolbar">
+    <a class="back-btn" routerLink="/">Search</a>
+    <a class="brand" routerLink="/">CineGraph</a>
+  </header>
+
+  @if (loading()) {
+    <div class="status">Finding shortest path…</div>
+  } @else {
+    @if (result(); as r) {
+      @if (r.found && r.nodes.length > 1) {
+        <div class="content">
+          <h1 class="page-title">
+            Shortest path from {{ r.nodes[0].title }} to {{ r.nodes[r.nodes.length - 1].title }}
+          </h1>
+          <div class="path-summary">{{ r.hops }} hop{{ r.hops === 1 ? '' : 's' }}</div>
+          <div class="chain-scroll">
+            <ol class="chain">
+              @for (node of r.nodes; track node.id; let i = $index) {
+                <li class="chain-node">
+                  <a class="chain-card" [routerLink]="['/film', node.id]">
+                    @if (node.posterPath; as poster) {
+                      <img
+                        class="chain-poster"
+                        [src]="posterUrl(poster, 'w500')"
+                        [srcset]="posterUrl(poster, 'w342') + ' 342w, ' + posterUrl(poster, 'w500') + ' 500w'"
+                        sizes="(max-width: 820px) 38px, 220px"
+                        [alt]="node.title"
+                      />
+                    } @else {
+                      <div class="chain-poster chain-poster--empty"></div>
+                    }
+                    <span class="chain-title">{{ node.title }}@if (node.year) { <span class="chain-year">{{ node.year }}</span> }</span>
+                  </a>
+                </li>
+                @if (i < r.edges.length) {
+                  <li class="chain-link">
+                    <span class="link-arrow" aria-hidden="true"></span>
+                    <span class="link-reason">{{ r.edges[i].topReason }}</span>
+                  </li>
+                }
+              }
+            </ol>
+          </div>
+        </div>
+      } @else {
+        <div class="status">{{ reasonText(r.reason) }}</div>
+      }
+    }
+  }
+</div>

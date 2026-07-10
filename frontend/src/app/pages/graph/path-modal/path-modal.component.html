@@ -38,7 +38,12 @@
     }
     @if (!computing() && result(); as r) {
       @if (r.found) {
-        <div class="path-summary">{{ r.hops }} hop{{ r.hops === 1 ? '' : 's' }}</div>
+        <div class="path-summary">
+          <span>{{ r.hops }} hop{{ r.hops === 1 ? '' : 's' }}</span>
+          <button class="share-btn" (click)="sharePath(r)">
+            {{ linkCopied() ? 'Link copied ✓' : 'Share path' }}
+          </button>
+        </div>
         <ol class="chain">
           @for (node of r.nodes; track node.id; let i = $index) {
             <li class="chain-node" (click)="openFilm(node.id)">

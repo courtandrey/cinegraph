@@ -6,6 +6,7 @@ import { LetterboxdPathModalComponent } from './letterboxd-path-modal/letterboxd
 import { LetterboxdStore } from '../../services/letterboxd-store.service';
 import { GraphStore } from '../../services/graph-store.service';
 import { MovieApiService } from '../../services/movie-api.service';
+import { SeoService } from '../../services/seo.service';
 import { GraphPayload, GraphNode, GraphEdge, MovieDetail } from '../../models/movie.model';
 
 interface PathView {
@@ -31,6 +32,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly router = inject(Router);
   private route = inject(ActivatedRoute);
   private api = inject(MovieApiService);
+  private seo = inject(SeoService);
 
   readonly selectedNodeId = signal<number | null>(null);
   readonly selectedDetail = signal<MovieDetail | null>(null);
@@ -139,6 +141,11 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.seo.apply({
+      title: 'Your Letterboxd recommendations | CineGraph',
+      description: 'Personal movie recommendation graph built from your Letterboxd ratings.',
+      noindex: true
+    });
     const hash = this.route.snapshot.paramMap.get('hash');
     if (!hash) { this.router.navigate(['/']); return; }
     if (this.store.hash() === hash && this.store.count() > 0) return;

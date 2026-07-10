@@ -1,0 +1,259 @@
+@use '../../../styles/tokens' as *;
+
+$poster-w: 220px;
+$poster-h: 330px;
+
+.path-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 14px;
+  background: $panel;
+  border-bottom: 1px solid $border;
+  flex-shrink: 0;
+  min-height: 40px;
+}
+
+.back-btn {
+  background: transparent;
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $text;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover {
+    background: $panel-2;
+    color: $text-bright;
+  }
+}
+
+.brand {
+  color: $heading;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.status {
+  padding: 28px 20px;
+  color: $text;
+  font-size: 14px;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 0 40px;
+  min-height: 0;
+}
+
+.page-title {
+  color: $heading;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: center;
+  padding: 0 20px 6px;
+}
+
+.path-summary {
+  color: $accent-green;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  padding-bottom: 28px;
+}
+
+.chain-scroll {
+  overflow-x: auto;
+  padding: 0 20px;
+}
+
+.chain {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  width: max-content;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.chain-node {
+  flex-shrink: 0;
+  width: $poster-w + 16px;
+}
+
+.chain-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover { background: $panel-2; }
+}
+
+.chain-poster {
+  width: $poster-w;
+  height: $poster-h;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid $border;
+
+  &--empty { background: $panel-2; }
+}
+
+.chain-title {
+  color: $text-bright;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.chain-year {
+  color: $text;
+  font-size: 13px;
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+.chain-link {
+  flex-shrink: 0;
+  width: 170px;
+  height: $poster-h + 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.link-arrow {
+  width: 100%;
+  height: 2px;
+  background: $text;
+  position: relative;
+  opacity: 0.8;
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -5px;
+    border-left: 12px solid $text;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+  }
+}
+
+.link-reason {
+  color: $text-bright;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media (max-width: 820px) {
+  .content {
+    justify-content: flex-start;
+    padding: 8px 0 24px;
+  }
+
+  .page-title {
+    font-size: 17px;
+    text-align: left;
+    padding: 12px 14px 4px;
+  }
+
+  .path-summary {
+    text-align: left;
+    padding: 0 14px 8px;
+  }
+
+  .chain-scroll {
+    overflow-x: visible;
+    padding: 0 14px;
+  }
+
+  .chain {
+    width: auto;
+    margin: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .chain-node {
+    width: auto;
+  }
+
+  .chain-card {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 6px;
+    border-radius: 3px;
+  }
+
+  .chain-poster {
+    width: 38px;
+    height: 57px;
+    border: none;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .chain-title {
+    font-size: 14px;
+    font-weight: 400;
+    text-align: left;
+  }
+
+  .chain-year { font-size: 12px; }
+
+  .chain-link {
+    width: auto;
+    height: auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 4px 0 4px 50px;
+  }
+
+  .link-arrow {
+    display: none;
+  }
+
+  .link-reason {
+    color: $text;
+    font-size: 12px;
+    text-align: left;
+
+    &::before { content: '↓ '; }
+  }
+}

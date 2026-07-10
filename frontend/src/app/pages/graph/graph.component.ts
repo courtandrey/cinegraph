@@ -7,6 +7,7 @@ import { WeightsPanelComponent, RoleSlider } from './weights-panel/weights-panel
 import { PathModalComponent } from './path-modal/path-modal.component';
 import { MovieApiService } from '../../services/movie-api.service';
 import { GraphStore } from '../../services/graph-store.service';
+import { SeoService } from '../../services/seo.service';
 import { crewScoreOf, rolesInGraph, COMPONENT_DEFAULTS } from '../../services/graph-scoring';
 import { GraphPayload, GraphNode, MovieDetail, EdgeBreakdown, RoleWeight, RecommendationBreakdown, RecommendationContribution } from '../../models/movie.model';
 
@@ -22,6 +23,7 @@ export class GraphComponent implements OnInit, OnDestroy {
   readonly router = inject(Router);
   private location = inject(Location);
   private api = inject(MovieApiService);
+  private seo = inject(SeoService);
   readonly store = inject(GraphStore);
 
   readonly loading = signal(false);
@@ -138,6 +140,7 @@ export class GraphComponent implements OnInit, OnDestroy {
         if (seq !== this.graphRequestSeq) return;
         this.graph.set(payload);
         this.loading.set(false);
+        this.applySeo(payload.center);
         this.store.addVisited({
           id: payload.center.id,
           title: payload.center.title,
@@ -147,6 +150,37 @@ export class GraphComponent implements OnInit, OnDestroy {
       },
       error: () => {
         if (seq === this.graphRequestSeq) this.loading.set(false);
+      }
+    });
+  }
+
+  private applySeo(center: MovieDetail): void {
+    const year = center.year ? ` (${center.year})` : '';
+    const overview = center.overview
+      ? ' ' + (center.overview.length > 120 ? center.overview.slice(0, 117).trimEnd() + '…' : center.overview)
+      : '';
+    if (this.hash()) {
+      this.seo.apply({
+        title: `${center.title}${year} — your Letterboxd graph | CineGraph`,
+        description: `Personal recommendation graph around ${center.title}${year}, built from your Letterboxd ratings.`,
+        noindex: true
+      });
+      return;
+    }
+    this.seo.apply({
+      title: `Movies like ${center.title}${year} — similarity graph | CineGraph`,
+      description: `Discover movies similar to ${center.title}${year}, connected through shared directors, writers, cinematographers and cast.${overview}`,
+      canonicalPath: `/film/${center.id}`,
+      image: center.posterPath ? `https://image.tmdb.org/t/p/w500${center.posterPath}` : null,
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'Movie',
+        name: center.title,
+        url: `${this.seo.siteUrl}/film/${center.id}`,
+        ...(center.releaseDate ? { datePublished: center.releaseDate } : {}),
+        ...(center.posterPath ? { image: `https://image.tmdb.org/t/p/w500${center.posterPath}` } : {}),
+        ...(center.overview ? { description: center.overview } : {}),
+        ...(center.genres.length ? { genre: center.genres.map(g => g.name) } : {})
       }
     });
   }

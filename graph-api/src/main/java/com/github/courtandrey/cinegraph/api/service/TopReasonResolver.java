@@ -20,7 +20,7 @@ public class TopReasonResolver {
         return best != null ? humanize(best) : "Related films";
     }
 
-    public String resolveCrewPerson(JsonNode arr) {
+    public String resolveCrewPerson(JsonNode arr, boolean reversed) {
         if (arr == null || !arr.isArray()) return "Shared crew";
         JsonNode best = null;
         double maxScore = Double.NEGATIVE_INFINITY;
@@ -29,13 +29,13 @@ public class TopReasonResolver {
             double score = c.path("score").asDouble(0);
             if (score > maxScore) { maxScore = score; best = c; }
         }
-        return best != null ? crewLabel(best) : "Shared crew";
+        return best != null ? crewLabel(best, reversed) : "Shared crew";
     }
 
-    private String crewLabel(JsonNode c) {
+    private String crewLabel(JsonNode c, boolean reversed) {
         String name  = c.path("name").asText(null);
-        String roleA = c.path("roleA").asText("");
-        String roleB = c.path("roleB").asText("");
+        String roleA = c.path(reversed ? "roleB" : "roleA").asText("");
+        String roleB = c.path(reversed ? "roleA" : "roleB").asText("");
         boolean same = c.path("sameRole").asBoolean(false);
         if (name == null || name.isBlank()) {
             return same ? roleLabel(roleA) : roleLabel(roleA) + " → " + roleLabel(roleB);

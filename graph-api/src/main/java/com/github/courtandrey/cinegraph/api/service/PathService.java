@@ -66,7 +66,9 @@ public class PathService {
             long s = ids.get(i);
             long t = ids.get(i + 1);
             edgeRepo.findEdge(s, t).ifPresent(e -> edges.add(new GraphEdge(
-                    s, t, e.totalScore(), topReason.resolveCrewPerson(e.components()), e.components())));
+                    s, t, e.totalScore(),
+                    topReason.resolveCrewPerson(e.components(), s != e.movieA()),
+                    e.components())));
         }
         return new PathResult(true, null, Math.max(0, ids.size() - 1), nodes, edges);
     }

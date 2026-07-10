@@ -2,3 +2,8 @@ spring:
   flyway:
     enabled: true
     locations: filesystem:../exporter/src/main/resources/db/migrations
+
+grpc:
+  client:
+    engine:
+      address: static://localhost:1

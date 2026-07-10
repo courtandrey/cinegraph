@@ -25,6 +25,10 @@ grpc:
       address: ${ENGINE_GRPC_ADDRESS:static://localhost:9090}
       negotiation-type: plaintext
 
+sitemap:
+  site-base-url: ${CINEGRAPH_HOST:http://localhost:4200}
+  max-urls: 45000
+
 graph:
   min-crew-score: 1.0
   per-person-cap: 20.0

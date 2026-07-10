@@ -7,7 +7,7 @@ declare global {
   interface Window {
     dataLayer: unknown[];
     gtag: (...args: unknown[]) => void;
-    __APP_CONFIG__?: { gaMeasurementId?: string };
+    __APP_CONFIG__?: { gaMeasurementId?: string; siteUrl?: string };
   }
 }
 

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: __CINEGRAPH_HOST__/sitemap.xml

@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { catchError, debounceTime, switchMap, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { MovieApiService } from '../../../services/movie-api.service';
+import { SeoService } from '../../../services/seo.service';
 import { MovieSummary, PathResult } from '../../../models/movie.model';
 
 const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
@@ -23,6 +24,7 @@ export class PathModalComponent {
   @Output() closed = new EventEmitter<void>();
 
   private api = inject(MovieApiService);
+  private seo = inject(SeoService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
   private doc = inject(DOCUMENT);
@@ -33,6 +35,8 @@ export class PathModalComponent {
   readonly searching = signal(false);
   readonly computing = signal(false);
   readonly result = signal<PathResult | null>(null);
+  readonly linkCopied = signal(false);
+  private copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.searchControl.valueChanges.pipe(
@@ -109,5 +113,21 @@ export class PathModalComponent {
   openFilm(id: number): void {
     this.closed.emit();
     this.router.navigate(['/film', id]);
+  }
+
+  sharePath(result: PathResult): void {
+    const last = result.nodes[result.nodes.length - 1];
+    if (!last) return;
+    const url = `${this.seo.siteUrl}/path/${this.fromId}/${last.id}`;
+    navigator.clipboard.writeText(url).then(
+      () => this.flagCopied(),
+      () => { navigator.share?.({ url }).catch(() => {}); }
+    );
+  }
+
+  private flagCopied(): void {
+    this.linkCopied.set(true);
+    if (this.copiedTimer) clearTimeout(this.copiedTimer);
+    this.copiedTimer = setTimeout(() => this.linkCopied.set(false), 2000);
   }
 }

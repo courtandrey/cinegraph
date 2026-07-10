@@ -55,6 +55,7 @@ services:
       DB_USER: ${DB_USER:-cinegraph}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      CINEGRAPH_HOST: ${CINEGRAPH_HOST:-}
       ENGINE_GRPC_ADDRESS: static://graph-engine:9090
       JAVA_OPTS: ${GRAPH_API_JAVA_OPTS:-}
     expose:
@@ -88,6 +89,7 @@ services:
       - graph-api
     environment:
       GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
+      CINEGRAPH_HOST: ${CINEGRAPH_HOST:-}
     expose:
       - "80"
     networks: [cinegraph]

@@ -76,7 +76,7 @@ public class MovieQueryRepository {
         return dsl.select(MOVIE.MOVIE_ID, MOVIE.TITLE, MOVIE.RELEASE_YEAR, MOVIE.POSTER_PATH)
                 .from(MOVIE)
                 .where(subset == null ? match : match.and(MOVIE.MOVIE_ID.in(subset)))
-                .orderBy(MOVIE.POPULARITY.desc().nullsLast())
+                .orderBy(MOVIE. POPULARITY.desc().nullsLast())
                 .limit(cap)
                 .fetch(r -> new SearchResult(
                         r.value1(),
@@ -145,6 +145,16 @@ public class MovieQueryRepository {
                         r.value2(),
                         r.value3(),
                         r.value4() == null ? 0 : r.value4().intValue()));
+    }
+
+    public record SitemapEntry(long movieId, java.time.OffsetDateTime updatedAt) {}
+
+    public List<SitemapEntry> findSitemapEntries(int limit) {
+        return ctx.select(MOVIE.MOVIE_ID, MOVIE.UPDATED_AT)
+                .from(MOVIE)
+                .orderBy(MOVIE.POPULARITY.desc().nullsLast(), MOVIE.MOVIE_ID.asc())
+                .limit(limit)
+                .fetch(r -> new SitemapEntry(r.value1(), r.value2()));
     }
 
     public List<GraphNode> findNodesByIds(List<Long> ids) {

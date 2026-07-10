@@ -1,8 +1,31 @@
 <div class="search-page">
   <div class="search-container">
-    <h1 class="page-title">Find a film</h1>
-    <p class="subtitle">Search by title to explore crew-based similarity graphs</p>
+    <h1 class="page-title">Explore the movie graph</h1>
+    <p class="subtitle">Search any film to see the movies most similar to it — connected through shared directors, writers, cinematographers and cast</p>
     <app-search-box />
     <app-letterboxd-upload />
+
+    <section class="about">
+      <h2>What is CineGraph?</h2>
+      <p>
+        CineGraph maps over a million films into one interactive similarity graph. Pick a film and
+        see the movies most like it, scored by the people they share — director, writer, cinematographer,
+        composer, editor, cast — plus genre, keyword and era overlap.
+      </p>
+      <p>
+        Import your Letterboxd ratings to get personal movie recommendations, or trace the shortest
+        path of connections from one film to another.
+      </p>
+      <p class="examples">
+        Try a graph:
+        @for (film of exampleFilms; track film.id) {
+          <a class="example-link" [routerLink]="['/film', film.id]">{{ film.title }}</a>
+        }
+      </p>
+      <p class="attribution">
+        Film data and posters from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>.
+        This product uses the TMDB API but is not endorsed or certified by TMDB.
+      </p>
+    </section>
   </div>
 </div>
