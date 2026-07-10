@@ -1,19 +1,26 @@
 package com.github.courtandrey.cinegraph.engine.graph;
 
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.PriorityQueue;
 
 public final class ImmutableGraph {
 
     private final long[] idByIdx;
     private final int[] offsets;
     private final IntBuffer neighbors;
+    private final FloatBuffer scores;
     private final int[] component;
 
-    public ImmutableGraph(long[] idByIdx, int[] offsets, IntBuffer neighbors) {
+    public ImmutableGraph(long[] idByIdx, int[] offsets, IntBuffer neighbors, FloatBuffer scores) {
         this.idByIdx = idByIdx;
         this.offsets = offsets;
         this.neighbors = neighbors;
+        this.scores = scores;
         this.component = computeComponents(idByIdx.length, offsets, neighbors);
     }
 
@@ -53,6 +60,58 @@ public final class ImmutableGraph {
             if (idx >= 0) mask[idx] = true;
         }
         return mask;
+    }
+
+    public record Scored(long movieId, double score) {}
+
+    public List<Scored> recommend(long[] seedIds, double[] coefs, boolean[] exclude,
+                                  int limit, boolean invert) {
+        if (limit <= 0) return List.of();
+        int n = idByIdx.length;
+        double[] acc = new double[n];
+        boolean[] seen = new boolean[n];
+        int[] touched = new int[n];
+        int count = 0;
+
+        for (int i = 0; i < seedIds.length; i++) {
+            int u = indexOf(seedIds[i]);
+            if (u < 0 || coefs[i] == 0.0) continue;
+            double coef = coefs[i];
+            for (int e = offsets[u]; e < offsets[u + 1]; e++) {
+                int v = neighbors.get(e);
+                if (exclude[v]) continue;
+                if (!seen[v]) {
+                    seen[v] = true;
+                    touched[count++] = v;
+                }
+                acc[v] += coef * scores.get(e);
+            }
+        }
+
+        PriorityQueue<Integer> heap = new PriorityQueue<>(limit + 1,
+                Comparator.comparingDouble(v -> invert ? -acc[v] : acc[v]));
+        for (int i = 0; i < count; i++) {
+            int v = touched[i];
+            if (!invert && acc[v] <= 0) continue;
+            if (heap.size() < limit) {
+                heap.offer(v);
+            } else {
+                double worstKept = invert ? -acc[heap.peek()] : acc[heap.peek()];
+                double rank = invert ? -acc[v] : acc[v];
+                if (rank > worstKept) {
+                    heap.poll();
+                    heap.offer(v);
+                }
+            }
+        }
+
+        List<Scored> out = new ArrayList<>(heap.size());
+        while (!heap.isEmpty()) {
+            int v = heap.poll();
+            out.add(new Scored(idByIdx[v], acc[v]));
+        }
+        java.util.Collections.reverse(out);
+        return out;
     }
 
     private long[] search(int from, int to, int maxHops, boolean[] allowed) {

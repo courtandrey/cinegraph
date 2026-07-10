@@ -3,6 +3,7 @@ package com.github.courtandrey.cinegraph.engine.graph;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
@@ -23,7 +24,8 @@ class GraphHolderTest {
     private static ImmutableGraph graphOf(int nodes) {
         long[] ids = new long[nodes];
         for (int i = 0; i < nodes; i++) ids[i] = i + 1;
-        return new ImmutableGraph(ids, new int[nodes + 1], IntBuffer.wrap(new int[0]));
+        return new ImmutableGraph(ids, new int[nodes + 1],
+                IntBuffer.wrap(new int[0]), FloatBuffer.wrap(new float[0]));
     }
 
     private GraphHolder holderWith(GraphLoader loader) {

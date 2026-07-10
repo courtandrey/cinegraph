@@ -43,3 +43,34 @@ message ReloadReply {
   bool started = 1;
   string state = 2;
 }
+
+service RecommendService {
+  rpc Recommend (RecommendRequest) returns (RecommendReply);
+}
+
+message SeedFilm {
+  int64 movie_id = 1;
+  double coef = 2;
+}
+
+message RecommendRequest {
+  repeated SeedFilm seeds = 1;
+  repeated int64 exclude = 2;
+  int32 limit = 3;
+  bool invert = 4;
+}
+
+enum RecommendStatus {
+  RECOMMEND_OK = 0;
+  RECOMMEND_LOADING = 1;
+}
+
+message ScoredMovie {
+  int64 movie_id = 1;
+  double score = 2;
+}
+
+message RecommendReply {
+  RecommendStatus status = 1;
+  repeated ScoredMovie items = 2;
+}

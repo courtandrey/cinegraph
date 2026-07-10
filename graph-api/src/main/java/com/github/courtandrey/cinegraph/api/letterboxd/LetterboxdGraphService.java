@@ -10,8 +10,10 @@ import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository;
 import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository.NeighborEdge;
 import com.github.courtandrey.cinegraph.api.repo.LetterboxdSetRepository;
 import com.github.courtandrey.cinegraph.api.repo.LetterboxdSetRepository.MovieRating;
+import com.github.courtandrey.cinegraph.api.repo.LetterboxdSetRepository.SetFilm;
 import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository;
 import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository.TitleYearMatch;
+import com.github.courtandrey.cinegraph.api.service.EngineRecommender;
 import com.github.courtandrey.cinegraph.api.service.GraphScoring;
 import com.github.courtandrey.cinegraph.api.service.PathService;
 import com.github.courtandrey.cinegraph.api.service.TopReasonResolver;
@@ -51,12 +53,14 @@ public class LetterboxdGraphService {
     private final ObjectMapper mapper;
     private final LetterboxdProperties props;
     private final PathService pathService;
+    private final EngineRecommender engineRecommender;
 
     public LetterboxdGraphService(LetterboxdClient client, MovieQueryRepository movieRepo,
                                   EdgeQueryRepository edgeRepo, LetterboxdSetRepository setRepo,
                                   TopReasonResolver topReason, GraphScoring graphScoring,
                                   GraphScoringProperties scoringProps, ObjectMapper mapper,
-                                  LetterboxdProperties props, PathService pathService) {
+                                  LetterboxdProperties props, PathService pathService,
+                                  EngineRecommender engineRecommender) {
         this.client = client;
         this.movieRepo = movieRepo;
         this.edgeRepo = edgeRepo;
@@ -67,6 +71,7 @@ public class LetterboxdGraphService {
         this.mapper = mapper;
         this.props = props;
         this.pathService = pathService;
+        this.engineRecommender = engineRecommender;
     }
 
     public PathResult pathWithinSet(String hash, long from, long to) {
@@ -94,7 +99,13 @@ public class LetterboxdGraphService {
 
     public List<GraphNode> recommendations(String hash, Long graphId, boolean invert, int limitReq) {
         int limit = Math.clamp(limitReq, 1, MAX_LIMIT);
-        List<EdgeQueryRepository.Recommendation> recs = edgeRepo.topRecommendations(hash, graphId, invert, limit);
+        List<SetFilm> films = setRepo.loadSetFilms(hash);
+        if (films.isEmpty()) return List.of();
+
+        List<EdgeQueryRepository.Recommendation> recs =
+                engineRecommendations(films, graphId, invert, limit)
+                        .orElseGet(() -> edgeRepo.topRecommendations(hash, graphId, invert, limit));
+
         Map<Long, GraphNode> nodeById = movieRepo
                 .findNodesByIds(recs.stream().map(EdgeQueryRepository.Recommendation::movieId).toList())
                 .stream()
@@ -104,6 +115,20 @@ public class LetterboxdGraphService {
                         .map(n -> n.withInScore(r.score())))
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    private Optional<List<EdgeQueryRepository.Recommendation>> engineRecommendations(
+            List<SetFilm> films, Long graphId, boolean invert, int limit) {
+        List<EngineRecommender.Seed> seeds = films.stream()
+                .filter(f -> graphId == null || Objects.equals(f.graphId(), graphId))
+                .map(f -> new EngineRecommender.Seed(f.movieId(),
+                        ratingCoef(f.rating() == null ? null : f.rating().doubleValue())))
+                .toList();
+        List<Long> exclude = films.stream().map(SetFilm::movieId).toList();
+        return Try.of(() -> engineRecommender.recommend(seeds, exclude, limit, invert))
+                .onFailure(e -> log.warn("[recs] engine unavailable, using SQL fallback: {}",
+                        e.getMessage()))
+                .getOrElse(Optional.empty());
     }
 
     public Optional<RecommendationBreakdown> recommendationBreakdown(String hash, long movieId) {

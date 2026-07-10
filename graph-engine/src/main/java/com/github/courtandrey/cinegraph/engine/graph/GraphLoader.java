@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.UncheckedIOException;
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -27,7 +28,7 @@ public class GraphLoader {
         long start = System.currentTimeMillis();
 
         LongIntCounter degree = new LongIntCounter(1 << 21);
-        scanEdges((a, b) -> {
+        scanEdges((a, b, score) -> {
             degree.increment(a);
             degree.increment(b);
         });
@@ -50,10 +51,13 @@ public class GraphLoader {
         }
         try {
             IntBuffer neighbors = builder.neighbors();
-            scanEdges((a, b) -> {
+            FloatBuffer scores = builder.scores();
+            scanEdges((a, b, score) -> {
                 int ia = Arrays.binarySearch(idByIdx, a);
                 int ib = Arrays.binarySearch(idByIdx, b);
+                scores.put(cursor[ia], score);
                 neighbors.put(cursor[ia]++, ib);
+                scores.put(cursor[ib], score);
                 neighbors.put(cursor[ib]++, ia);
             });
             builder.commit();
@@ -71,12 +75,12 @@ public class GraphLoader {
 
     private void scanEdges(EdgeConsumer consumer) {
         ctx.transaction(cfg -> {
-            try (var edges = cfg.dsl().select(EDGE.MOVIE_A, EDGE.MOVIE_B)
+            try (var edges = cfg.dsl().select(EDGE.MOVIE_A, EDGE.MOVIE_B, EDGE.TOTAL_SCORE)
                     .from(EDGE)
                     .fetchSize(50_000)
                     .fetchLazy()) {
                 for (var e : edges) {
-                    consumer.accept(e.value1(), e.value2());
+                    consumer.accept(e.value1(), e.value2(), e.value3());
                 }
             }
         });
@@ -84,6 +88,6 @@ public class GraphLoader {
 
     @FunctionalInterface
     private interface EdgeConsumer {
-        void accept(long movieA, long movieB);
+        void accept(long movieA, long movieB, float score);
     }
 }

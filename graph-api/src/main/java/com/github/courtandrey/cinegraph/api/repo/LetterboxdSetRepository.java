@@ -14,6 +14,8 @@ public class LetterboxdSetRepository {
 
     public record MovieRating(long movieId, Double rating) {}
 
+    public record SetFilm(long movieId, Float rating, Long graphId) {}
+
     private final DSLContext ctx;
 
     public LetterboxdSetRepository(DSLContext ctx) {
@@ -27,6 +29,13 @@ public class LetterboxdSetRepository {
     public boolean contains(String hash, long movieId) {
         return ctx.fetchExists(selectOne().from(LETTERBOXD_SET)
                 .where(LETTERBOXD_SET.HASH.eq(hash).and(LETTERBOXD_SET.MOVIE_ID.eq(movieId))));
+    }
+
+    public List<SetFilm> loadSetFilms(String hash) {
+        return ctx.select(LETTERBOXD_SET.MOVIE_ID, LETTERBOXD_SET.RATING, LETTERBOXD_SET.GRAPH_ID)
+                .from(LETTERBOXD_SET)
+                .where(LETTERBOXD_SET.HASH.eq(hash))
+                .fetch(r -> new SetFilm(r.value1(), r.value2(), r.value3()));
     }
 
     public List<Long> loadMovieIds(String hash) {

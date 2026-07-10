@@ -177,11 +177,11 @@ For a quick smoke test before committing to the full ~10-hour ingest, set
 
 ### Scale expectations
 
-| Operation | Duration / size                |
-|---|--------------------------------|
-| Full ingest (~1.05M movies @ 30 req/s) | 10–12 hours, resumable         |
-| Full edge build | 1–3 hours                      |
-| Edge table | 100M rows, ~5–15 GB with JSONB |
+| Operation | Duration / size                 |
+|---|---------------------------------|
+| Full ingest (~1.05M movies @ 30 req/s) | 10–12 hours, resumable          |
+| Full edge build | 1–3 hours                       |
+| Edge table | 100M rows, ~80–90 GB with JSONB |
 
 ### Daily updates
 
