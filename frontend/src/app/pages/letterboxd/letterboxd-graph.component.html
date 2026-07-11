@@ -117,6 +117,10 @@
             <div class="recs-empty">Scoring films similar to yours…</div>
           }
         </div>
+
+        <div class="panel-footer">
+          <button class="check-compat-btn" (click)="openCompatSearch()">Check compatibility</button>
+        </div>
       </aside>
     } @else {
     @if (path(); as pv) {
@@ -165,10 +169,18 @@
           <h2 class="detail-title">{{ m.title }}</h2>
           @if (m.year) { <div class="detail-year">{{ m.year }}</div> }
 
-          <div class="inscore-row">
-            <span class="inscore-label">{{ selectedScoreLabel() }}</span>
-            <span class="inscore-value" [class.negative]="selectedInScore() < 0">{{ selectedInScore().toFixed(1) }}</span>
-          </div>
+          @if (selectedNotConnected()) {
+            <div class="not-connected-row">Not connected to your set.</div>
+          } @else {
+            <div class="inscore-row">
+              <span class="inscore-label">{{ selectedScoreLabel() }}</span>
+              @if (compatChecking()) {
+                <span class="inscore-value inscore-checking">Checking…</span>
+              } @else {
+                <span class="inscore-value" [class.negative]="selectedInScore() < 0">{{ selectedInScore().toFixed(1) }}</span>
+              }
+            </div>
+          }
 
           @if (m.genres.length > 0) {
             <div class="section-header">GENRES</div>
@@ -200,7 +212,7 @@
           @if (!isRecommendation()) {
             <button class="find-path-btn" (click)="openPathSearch()">FIND PATH</button>
           }
-          <button class="deep-dive-btn" (click)="deepDive()">DEEP DIVE</button>
+          <button class="deep-dive-btn" (click)="deepDive()" [disabled]="selectedNotConnected()">DEEP DIVE</button>
         </div>
       </div>
     </aside>
@@ -210,6 +222,10 @@
 
   @if (searchOpen()) {
     <app-letterboxd-search (pick)="onSearchPick($event)" (closed)="searchOpen.set(false)" />
+  }
+
+  @if (compatSearchOpen()) {
+    <app-compat-search [hash]="store.hash() ?? ''" (pick)="onCompatPick($event)" (closed)="compatSearchOpen.set(false)" />
   }
 
   @if (pathSearchOpen()) {

@@ -3,8 +3,11 @@ package com.github.courtandrey.cinegraph.api.repo;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.LETTERBOXD_SET;
 import static org.jooq.impl.DSL.selectOne;
@@ -36,6 +39,14 @@ public class LetterboxdSetRepository {
                 .from(LETTERBOXD_SET)
                 .where(LETTERBOXD_SET.HASH.eq(hash))
                 .fetch(r -> new SetFilm(r.value1(), r.value2(), r.value3()));
+    }
+
+    public Set<Long> filterInSet(String hash, Collection<Long> movieIds) {
+        if (movieIds.isEmpty()) return Set.of();
+        return new HashSet<>(ctx.select(LETTERBOXD_SET.MOVIE_ID)
+                .from(LETTERBOXD_SET)
+                .where(LETTERBOXD_SET.HASH.eq(hash).and(LETTERBOXD_SET.MOVIE_ID.in(movieIds)))
+                .fetch(LETTERBOXD_SET.MOVIE_ID));
     }
 
     public List<Long> loadMovieIds(String hash) {

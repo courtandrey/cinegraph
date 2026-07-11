@@ -355,10 +355,17 @@
 .dismiss-btn {
   border: none;
 
-  &:hover { filter: brightness(1.08); }
+  &:hover:not(:disabled) { filter: brightness(1.08); }
 }
 
 .deep-dive-btn { background: $accent-green; color: #06140a; }
+
+.deep-dive-btn:disabled {
+  background: $panel-2;
+  color: $text;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .dismiss-btn { background: $accent-orange; color: #1a0d00; }
 
 .find-path-btn {
@@ -393,6 +400,39 @@
 
 .recs-panel { --rec-accent: #{$accent-blue}; }
 .recs-panel.inverted { --rec-accent: #{$accent-red}; }
+
+.check-compat-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  background: $accent-blue;
+  color: #04141c;
+
+  &:hover { filter: brightness(1.08); }
+}
+
+.inscore-checking {
+  color: $text;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.not-connected-row {
+  padding: 10px 12px;
+  background: $panel-2;
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $accent-orange;
+  font-size: 13px;
+  line-height: 1.4;
+}
 
 .recs-head {
   display: flex;

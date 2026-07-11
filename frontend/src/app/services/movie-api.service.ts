@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MovieSummary, MovieDetail, GraphPayload, GraphNode, EdgeBreakdown, RoleWeight, LetterboxdGraph, LetterboxdUploadResponse, LetterboxdSearchResult, LetterboxdAttachment, PathResult, RecommendationBreakdown } from '../models/movie.model';
+import { MovieSummary, MovieDetail, GraphPayload, GraphNode, EdgeBreakdown, RoleWeight, LetterboxdGraph, LetterboxdUploadResponse, LetterboxdSearchResult, LetterboxdAttachment, PathResult, RecommendationBreakdown, CompatSearchResult } from '../models/movie.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -53,6 +53,12 @@ export class MovieApiService {
 
   letterboxdOverview(hash: string) {
     return this.http.get<LetterboxdGraph[]>(`${this.base}/letterboxd/${hash}/graphs`);
+  }
+
+  letterboxdSearchGlobal(hash: string, q: string, limit = 10) {
+    return this.http.get<CompatSearchResult[]>(`${this.base}/letterboxd/${hash}/search-global`, {
+      params: { q, limit: limit.toString() }
+    });
   }
 
   letterboxdSearch(hash: string, q: string, limit = 10) {

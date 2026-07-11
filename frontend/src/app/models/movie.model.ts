@@ -66,6 +66,14 @@ export interface LetterboxdSearchResult {
   graphId: number | null;
 }
 
+export interface CompatSearchResult {
+  id: number;
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+  fromSet: boolean;
+}
+
 export interface LetterboxdAttachment {
   node: GraphNode;
   edges: GraphEdge[];

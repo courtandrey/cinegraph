@@ -64,6 +64,16 @@ public class LetterboxdController {
         return ResponseEntity.ok(service.search(hash, q.trim(), Math.min(limit, 50)));
     }
 
+    @GetMapping("/{hash}/search-global")
+    public ResponseEntity<?> searchGlobal(@PathVariable String hash,
+                                          @RequestParam String q,
+                                          @RequestParam(defaultValue = "10") int limit) {
+        if (q == null || q.trim().length() < 2) {
+            return ResponseEntity.ok(java.util.List.of());
+        }
+        return ResponseEntity.ok(service.searchGlobal(hash, q.trim(), Math.min(limit, 50)));
+    }
+
     @GetMapping("/{hash}/recommendations")
     public ResponseEntity<?> recommendations(@PathVariable String hash,
                                              @RequestParam(required = false) Long graphId,

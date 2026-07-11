@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, computed, effect, inject, signal, untrack
 import { ActivatedRoute, Router } from '@angular/router';
 import { GraphCanvasComponent } from '../graph/graph-canvas/graph-canvas.component';
 import { LetterboxdSearchComponent } from './letterboxd-search/letterboxd-search.component';
+import { CompatSearchComponent } from './compat-search/compat-search.component';
 import { LetterboxdPathModalComponent } from './letterboxd-path-modal/letterboxd-path-modal.component';
 import { LetterboxdStore } from '../../services/letterboxd-store.service';
 import { GraphStore } from '../../services/graph-store.service';
@@ -22,7 +23,7 @@ const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
 @Component({
   selector: 'app-letterboxd-graph',
   standalone: true,
-  imports: [GraphCanvasComponent, LetterboxdSearchComponent, LetterboxdPathModalComponent],
+  imports: [GraphCanvasComponent, LetterboxdSearchComponent, CompatSearchComponent, LetterboxdPathModalComponent],
   templateUrl: './letterboxd-graph.component.html',
   styleUrl: './letterboxd-graph.component.scss'
 })
@@ -39,6 +40,10 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly status = signal<'loading' | 'ready' | 'error'>('ready');
   readonly thresholdDisplay = signal(this.store.inScoreThreshold());
   readonly searchOpen = signal(false);
+  readonly compatSearchOpen = signal(false);
+  readonly compatId = signal<number | null>(null);
+  readonly compatScoreValue = signal<number | null>(null);
+  readonly compatNotConnected = signal(false);
   readonly forcedNodeIds = signal<Set<number>>(new Set());
   readonly focusTarget = signal<{ id: number } | null>(null);
 
@@ -102,12 +107,26 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly selectedInScore = computed(() => {
     const id = this.selectedNodeId();
     if (id == null) return 0;
+    if (this.compatId() === id) return this.compatScoreValue() ?? 0;
     return this.inScoreById().get(id) ?? this.recScoreById().get(id) ?? 0;
   });
 
   readonly isRecommendation = computed(() => {
     const id = this.selectedNodeId();
-    return id != null && !this.inScoreById().has(id) && this.recScoreById().has(id);
+    if (id == null) return false;
+    if (this.compatId() === id) return true;
+    return !this.inScoreById().has(id) && this.recScoreById().has(id);
+  });
+
+  readonly compatChecking = computed(() => {
+    const id = this.selectedNodeId();
+    return id != null && this.compatId() === id
+      && this.compatScoreValue() === null && !this.compatNotConnected();
+  });
+
+  readonly selectedNotConnected = computed(() => {
+    const id = this.selectedNodeId();
+    return id != null && this.compatId() === id && this.compatNotConnected();
   });
 
   readonly selectedScoreLabel = computed(() =>
@@ -169,6 +188,9 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (this.path()) this.dismissPath();
     this.recsOpen.set(false);
     this.detailReturn.set(null);
+    this.compatId.set(null);
+    this.compatScoreValue.set(null);
+    this.compatNotConnected.set(false);
     this.selectedNodeId.set(id);
     this.selectedDetail.set(null);
     const seq = ++this.detailSeq;
@@ -186,7 +208,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   deepDive(): void {
     const id = this.selectedNodeId();
     const hash = this.store.hash();
-    if (id == null || !hash) return;
+    if (id == null || !hash || this.selectedNotConnected()) return;
     this.graphStore.setMinScore(0);
     this.graphStore.resetLimit();
     this.router.navigate(['/letterboxd', hash, 'film', id]);
@@ -231,6 +253,29 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   backToRecs(): void {
     this.openRecs();
+  }
+
+  openCompatSearch(): void {
+    this.compatSearchOpen.set(true);
+  }
+
+  onCompatPick(movieId: number): void {
+    this.compatSearchOpen.set(false);
+    const hash = this.store.hash();
+    if (!hash) return;
+    this.onNodeTap(movieId);
+    this.detailReturn.set('recs');
+    this.compatId.set(movieId);
+    this.compatScoreValue.set(null);
+    this.compatNotConnected.set(false);
+    this.api.letterboxdRecommendationBreakdown(hash, movieId).subscribe({
+      next: bd => {
+        if (this.compatId() !== movieId) return;
+        if (!bd.contributions?.length) this.compatNotConnected.set(true);
+        else this.compatScoreValue.set(bd.total);
+      },
+      error: () => { if (this.compatId() === movieId) this.compatNotConnected.set(true); }
+    });
   }
 
   onSearchPick(sel: { movieId: number; graphId: number }): void {

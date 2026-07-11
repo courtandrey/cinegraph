@@ -97,6 +97,16 @@ public class LetterboxdGraphService {
         return movieRepo.searchInSet(q, limit, hash);
     }
 
+    public List<CompatSearchResult> searchGlobal(String hash, String q, int limit) {
+        List<SearchResult> results = movieRepo.search(q, limit);
+        if (results.isEmpty()) return List.of();
+        Set<Long> inSet = setRepo.filterInSet(hash, results.stream().map(SearchResult::id).toList());
+        return results.stream()
+                .map(r -> new CompatSearchResult(r.id(), r.title(), r.year(), r.posterPath(),
+                        inSet.contains(r.id())))
+                .toList();
+    }
+
     public List<GraphNode> recommendations(String hash, Long graphId, boolean invert, int limitReq) {
         int limit = Math.clamp(limitReq, 1, MAX_LIMIT);
         List<SetFilm> films = setRepo.loadSetFilms(hash);
