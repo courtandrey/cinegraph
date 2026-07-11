@@ -18,7 +18,7 @@ export class MovieApiService {
     return this.http.get<MovieDetail>(`${this.base}/movies/${id}`);
   }
 
-  getGraph(id: number, minScore = 12, limit = 40) {
+  getGraph(id: number, minScore = 0, limit = 40) {
     return this.http.get<GraphPayload>(`${this.base}/movies/${id}/graph`, {
       params: { minScore: minScore.toString(), limit: limit.toString() }
     });
@@ -85,7 +85,7 @@ export class MovieApiService {
     });
   }
 
-  letterboxdRecenter(hash: string, movieId: number, minScore = 12, limit = 40) {
+  letterboxdRecenter(hash: string, movieId: number, minScore = 0, limit = 40) {
     return this.http.post<GraphPayload>(`${this.base}/letterboxd/recenter`, {
       hash, movieId, minScore, limit
     });

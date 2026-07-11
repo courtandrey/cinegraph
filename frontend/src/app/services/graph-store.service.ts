@@ -8,7 +8,7 @@ export class GraphStore {
 
   static readonly DEFAULT_LIMIT = 25;
 
-  private _minScore = signal(12);
+  private _minScore = signal(0);
   private _limit = signal(GraphStore.DEFAULT_LIMIT);
   readonly minScore = this._minScore.asReadonly();
   readonly limit = this._limit.asReadonly();

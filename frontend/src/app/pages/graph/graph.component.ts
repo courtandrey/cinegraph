@@ -273,6 +273,9 @@ export class GraphComponent implements OnInit, OnDestroy {
 
   onWeightsReset(): void {
     this.store.setCustomWeights(null);
+    this.store.setMinScore(0);
+    this.minScoreDisplay.set(0);
+    if (this.minScoreTimer) clearTimeout(this.minScoreTimer);
     this.fetchGraph();
   }
 

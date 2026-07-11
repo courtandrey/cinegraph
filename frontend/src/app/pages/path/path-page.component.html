@@ -10,6 +10,7 @@
     @if (result(); as r) {
       @if (r.found && r.nodes.length > 1) {
         <div class="content">
+         <div class="path-inner">
           <h1 class="page-title">
             Shortest path from {{ r.nodes[0].title }} to {{ r.nodes[r.nodes.length - 1].title }}
           </h1>
@@ -42,6 +43,7 @@
               }
             </ol>
           </div>
+         </div>
         </div>
       } @else {
         <div class="status">{{ reasonText(r.reason) }}</div>

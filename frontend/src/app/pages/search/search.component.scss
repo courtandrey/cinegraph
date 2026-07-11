@@ -1,15 +1,15 @@
 @use '../../../styles/tokens' as *;
 
 .search-page {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 40px 20px;
 }
 
 .search-container {
+  margin: auto;
   width: 100%;
   max-width: 640px;
 }

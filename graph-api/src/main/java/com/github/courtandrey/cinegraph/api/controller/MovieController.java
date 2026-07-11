@@ -72,7 +72,7 @@ public class MovieController {
     @GetMapping("/{id}/graph")
     public ResponseEntity<?> graph(
             @PathVariable long id,
-            @RequestParam(defaultValue = "12.0") float minScore,
+            @RequestParam(defaultValue = "0") float minScore,
             @RequestParam(defaultValue = "40")   int limit) {
 
         var center = movieRepo.findById(id);

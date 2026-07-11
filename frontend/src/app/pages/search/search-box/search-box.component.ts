@@ -87,6 +87,7 @@ export class SearchBoxComponent {
     this.searchControl.setValue(movie.title, { emitEvent: false });
     this.close();
     this.graphStore.resetLimit();
+    this.graphStore.setMinScore(0);
     this.router.navigate(['/film', movie.id]);
   }
 
