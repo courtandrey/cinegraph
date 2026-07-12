@@ -19,3 +19,10 @@ else
     [ -f "$f" ] && sed -i "/__CINEGRAPH_HOST__/d" "$f"
   done
 fi
+
+ga="${GA_MEASUREMENT_ID:-}"
+if [ -n "$ga" ] && [ -f "$html" ]; then
+  snippet="<script async src=\"https://www.googletagmanager.com/gtag/js?id=${ga}\"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('consent','default',{analytics_storage:'denied'});gtag('config','${ga}',{send_page_view:false});</script>"
+  snippet_esc=$(printf '%s' "$snippet" | sed 's/[&|\\]/\\&/g')
+  sed -i "s|</head>|${snippet_esc}</head>|" "$html"
+fi

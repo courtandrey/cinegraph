@@ -17,7 +17,7 @@ const CONSENT_KEY = 'ga-consent';
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private router = inject(Router);
-  private loaded = false;
+  private tracking = false;
   private navSubscribed = false;
 
   private get measurementId(): string {
@@ -26,7 +26,7 @@ export class AnalyticsService {
   }
 
   get enabled(): boolean {
-    return environment.production && !!this.measurementId;
+    return environment.production && !!this.measurementId && typeof window.gtag === 'function';
   }
 
   consentState(): 'granted' | 'denied' | 'unset' {
@@ -45,23 +45,16 @@ export class AnalyticsService {
 
   denyConsent(): void {
     localStorage.setItem(CONSENT_KEY, 'denied');
+    if (typeof window.gtag === 'function') {
+      window.gtag('consent', 'update', { analytics_storage: 'denied' });
+    }
   }
 
   private enable(): void {
-    if (!this.enabled || this.loaded) return;
-    this.loaded = true;
+    if (!this.enabled || this.tracking) return;
+    this.tracking = true;
 
-    const id = this.measurementId;
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
-    document.head.appendChild(script);
-
-    window.dataLayer = window.dataLayer || [];
-    window.gtag = function gtag() { window.dataLayer.push(arguments); };
-    window.gtag('js', new Date());
-    window.gtag('config', id, { send_page_view: false });
-
+    window.gtag('consent', 'update', { analytics_storage: 'granted' });
     this.pageView(this.router.url);
     this.trackNavigations();
   }
@@ -75,7 +68,7 @@ export class AnalyticsService {
   }
 
   private pageView(path: string): void {
-    if (!this.loaded) return;
+    if (!this.tracking) return;
     window.gtag('event', 'page_view', {
       page_path: path,
       page_location: window.location.href,
