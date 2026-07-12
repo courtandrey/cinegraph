@@ -17,23 +17,33 @@ import org.springframework.beans.factory.annotation.Value;
 public class PathGrpcService extends PathServiceGrpc.PathServiceImplBase {
 
     private final GraphHolder holder;
+    private final QueryGate gate;
     private final int maxHops;
 
-    public PathGrpcService(GraphHolder holder, @Value("${engine.max-hops:20}") int maxHops) {
+    public PathGrpcService(GraphHolder holder, QueryGate gate,
+                           @Value("${engine.max-hops:20}") int maxHops) {
         this.holder = holder;
+        this.gate = gate;
         this.maxHops = maxHops;
     }
 
     @Override
     public void shortestPath(PathRequest request, StreamObserver<PathReply> responseObserver) {
-        responseObserver.onNext(computePath(request.getFrom(), request.getTo()));
-        responseObserver.onCompleted();
+        reply(responseObserver, () -> computePath(request.getFrom(), request.getTo()));
     }
 
     @Override
     public void shortestPathWithin(SubsetPathRequest request, StreamObserver<PathReply> responseObserver) {
-        responseObserver.onNext(computePathWithin(request));
-        responseObserver.onCompleted();
+        reply(responseObserver, () -> computePathWithin(request));
+    }
+
+    private void reply(StreamObserver<PathReply> observer, java.util.function.Supplier<PathReply> compute) {
+        try {
+            observer.onNext(gate.execute(compute));
+            observer.onCompleted();
+        } catch (io.grpc.StatusRuntimeException e) {
+            observer.onError(e);
+        }
     }
 
     private PathReply computePath(long from, long to) {

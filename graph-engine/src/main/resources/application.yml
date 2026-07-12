@@ -21,6 +21,8 @@ grpc:
 
 engine:
   max-hops: ${ENGINE_MAX_HOPS:20}
+  max-concurrent-queries: ${ENGINE_MAX_CONCURRENT_QUERIES:0}
+  queue-timeout-ms: ${ENGINE_QUEUE_TIMEOUT_MS:2000}
   load-on-startup: ${ENGINE_LOAD_ON_STARTUP:true}
   snapshot-path: ${ENGINE_SNAPSHOT_PATH:data/graph-snapshot.bin}
 

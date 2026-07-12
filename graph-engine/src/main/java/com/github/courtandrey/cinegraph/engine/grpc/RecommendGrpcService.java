@@ -16,15 +16,21 @@ import java.util.List;
 public class RecommendGrpcService extends RecommendServiceGrpc.RecommendServiceImplBase {
 
     private final GraphHolder holder;
+    private final QueryGate gate;
 
-    public RecommendGrpcService(GraphHolder holder) {
+    public RecommendGrpcService(GraphHolder holder, QueryGate gate) {
         this.holder = holder;
+        this.gate = gate;
     }
 
     @Override
     public void recommend(RecommendRequest request, StreamObserver<RecommendReply> responseObserver) {
-        responseObserver.onNext(compute(request));
-        responseObserver.onCompleted();
+        try {
+            responseObserver.onNext(gate.execute(() -> compute(request)));
+            responseObserver.onCompleted();
+        } catch (io.grpc.StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
     }
 
     private RecommendReply compute(RecommendRequest request) {

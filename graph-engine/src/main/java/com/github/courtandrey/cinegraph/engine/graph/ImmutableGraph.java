@@ -7,14 +7,19 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.function.Function;
 
 public final class ImmutableGraph {
+
+    private static final int MAX_POOLED_WORKSPACES = 32;
 
     private final long[] idByIdx;
     private final int[] offsets;
     private final IntBuffer neighbors;
     private final FloatBuffer scores;
     private final int[] component;
+    private final ArrayBlockingQueue<Workspace> pool = new ArrayBlockingQueue<>(MAX_POOLED_WORKSPACES);
 
     public ImmutableGraph(long[] idByIdx, int[] offsets, IntBuffer neighbors, FloatBuffer scores) {
         this.idByIdx = idByIdx;
@@ -45,12 +50,12 @@ public final class ImmutableGraph {
     }
 
     public long[] shortestPath(int from, int to, int maxHops) {
-        return search(from, to, maxHops, null);
+        return withWorkspace(ws -> search(from, to, maxHops, null, ws));
     }
 
     public long[] shortestPathWithin(int from, int to, boolean[] allowed, int maxHops) {
         if (from < 0 || to < 0 || !allowed[from] || !allowed[to]) return null;
-        return search(from, to, maxHops, allowed);
+        return withWorkspace(ws -> search(from, to, maxHops, allowed, ws));
     }
 
     public boolean[] allowedMask(java.util.Collection<Long> ids) {
@@ -67,11 +72,24 @@ public final class ImmutableGraph {
     public List<Scored> recommend(long[] seedIds, double[] coefs, boolean[] exclude,
                                   int limit, boolean invert) {
         if (limit <= 0) return List.of();
-        int n = idByIdx.length;
-        double[] acc = new double[n];
-        boolean[] seen = new boolean[n];
-        int[] touched = new int[n];
-        int count = 0;
+        return withWorkspace(ws -> recommend(seedIds, coefs, exclude, limit, invert, ws));
+    }
+
+    private <T> T withWorkspace(Function<Workspace, T> query) {
+        Workspace ws = pool.poll();
+        if (ws == null) ws = new Workspace(idByIdx.length);
+        try {
+            return query.apply(ws);
+        } finally {
+            pool.offer(ws);
+        }
+    }
+
+    private List<Scored> recommend(long[] seedIds, double[] coefs, boolean[] exclude,
+                                   int limit, boolean invert, Workspace ws) {
+        float[] acc = ws.accCleared();
+        boolean[] seen = ws.seen();
+        Workspace.IntList touched = ws.touched;
 
         for (int i = 0; i < seedIds.length; i++) {
             int u = indexOf(seedIds[i]);
@@ -82,16 +100,16 @@ public final class ImmutableGraph {
                 if (exclude[v]) continue;
                 if (!seen[v]) {
                     seen[v] = true;
-                    touched[count++] = v;
+                    touched.add(v);
                 }
-                acc[v] += coef * scores.get(e);
+                acc[v] += (float) (coef * scores.get(e));
             }
         }
 
         PriorityQueue<Integer> heap = new PriorityQueue<>(limit + 1,
                 Comparator.comparingDouble(v -> invert ? -acc[v] : acc[v]));
-        for (int i = 0; i < count; i++) {
-            int v = touched[i];
+        for (int i = 0; i < touched.len; i++) {
+            int v = touched.a[i];
             if (!invert && acc[v] <= 0) continue;
             if (heap.size() < limit) {
                 heap.offer(v);
@@ -114,66 +132,62 @@ public final class ImmutableGraph {
         return out;
     }
 
-    private long[] search(int from, int to, int maxHops, boolean[] allowed) {
+    private long[] search(int from, int to, int maxHops, boolean[] allowed, Workspace ws) {
         if (from == to) return new long[]{idByIdx[from]};
+        int hopCap = Math.min(maxHops, Byte.MAX_VALUE);
 
-        int n = idByIdx.length;
-        int[] distF = new int[n];
-        int[] distB = new int[n];
-        int[] parF = new int[n];
-        int[] parB = new int[n];
-        Arrays.fill(distF, -1);
-        Arrays.fill(distB, -1);
+        byte[] distF = ws.depthF();
+        byte[] distB = ws.depthB();
+        int[] parF = ws.parentF();
+        int[] parB = ws.parentB();
         distF[from] = 0;
         distB[to] = 0;
 
-        int[] frontF = new int[n];
-        int[] frontB = new int[n];
-        int[] spare = new int[n];
-        frontF[0] = from;
-        frontB[0] = to;
-        int lenF = 1;
-        int lenB = 1;
+        Workspace.IntList frontF = ws.frontF;
+        Workspace.IntList frontB = ws.frontB;
+        Workspace.IntList spare = ws.spare;
+        frontF.len = 0;
+        frontF.add(from);
+        frontB.len = 0;
+        frontB.add(to);
         int dF = 0;
         int dB = 0;
         int best = Integer.MAX_VALUE;
         int meet = -1;
 
-        while (lenF > 0 && lenB > 0 && dF + dB < best && dF + dB < maxHops) {
-            boolean expandF = lenF <= lenB;
-            int[] front = expandF ? frontF : frontB;
-            int len = expandF ? lenF : lenB;
-            int[] dist = expandF ? distF : distB;
-            int[] other = expandF ? distB : distF;
+        while (frontF.len > 0 && frontB.len > 0 && dF + dB < best && dF + dB < hopCap) {
+            boolean expandF = frontF.len <= frontB.len;
+            Workspace.IntList front = expandF ? frontF : frontB;
+            byte[] dist = expandF ? distF : distB;
+            byte[] other = expandF ? distB : distF;
             int[] par = expandF ? parF : parB;
             int depth = (expandF ? dF : dB) + 1;
 
-            int count = 0;
-            for (int i = 0; i < len; i++) {
-                int u = front[i];
+            spare.len = 0;
+            for (int i = 0; i < front.len; i++) {
+                int u = front.a[i];
                 for (int e = offsets[u]; e < offsets[u + 1]; e++) {
                     int v = neighbors.get(e);
                     if (allowed != null && !allowed[v]) continue;
                     if (dist[v] != -1) continue;
-                    dist[v] = depth;
+                    dist[v] = (byte) depth;
                     par[v] = u;
-                    spare[count++] = v;
+                    spare.add(v);
                     if (other[v] != -1 && depth + other[v] < best) {
                         best = depth + other[v];
                         meet = v;
                     }
                 }
             }
+            Workspace.IntList emptied = front;
             if (expandF) {
                 frontF = spare;
-                lenF = count;
                 dF = depth;
             } else {
                 frontB = spare;
-                lenB = count;
                 dB = depth;
             }
-            spare = front;
+            spare = emptied;
         }
 
         if (meet < 0) return null;

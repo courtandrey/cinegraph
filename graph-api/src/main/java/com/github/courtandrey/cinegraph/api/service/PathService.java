@@ -9,18 +9,27 @@ import com.github.courtandrey.cinegraph.proto.PathReply;
 import com.github.courtandrey.cinegraph.proto.PathRequest;
 import com.github.courtandrey.cinegraph.proto.PathServiceGrpc;
 import com.github.courtandrey.cinegraph.proto.SubsetPathRequest;
+import io.grpc.StatusRuntimeException;
+import io.vavr.control.Try;
 import net.devh.boot.grpc.client.inject.GrpcClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
 public class PathService {
+
+    private static final Logger log = LoggerFactory.getLogger(PathService.class);
+    private static final long DEADLINE_MS = 15_000;
 
     private final MovieQueryRepository movieRepo;
     private final EdgeQueryRepository edgeRepo;
@@ -36,14 +45,31 @@ public class PathService {
     }
 
     public PathResult shortestPath(long from, long to) {
-        PathReply reply = engine.shortestPath(PathRequest.newBuilder().setFrom(from).setTo(to).build());
-        return toResult(reply);
+        return callEngine(() -> engine.withDeadlineAfter(DEADLINE_MS, TimeUnit.MILLISECONDS)
+                .shortestPath(PathRequest.newBuilder().setFrom(from).setTo(to).build()));
     }
 
     public PathResult shortestPathWithin(long from, long to, List<Long> allowed) {
-        PathReply reply = engine.shortestPathWithin(SubsetPathRequest.newBuilder()
-                .setFrom(from).setTo(to).addAllAllowed(allowed).build());
-        return toResult(reply);
+        return callEngine(() -> engine.withDeadlineAfter(DEADLINE_MS, TimeUnit.MILLISECONDS)
+                .shortestPathWithin(SubsetPathRequest.newBuilder()
+                        .setFrom(from).setTo(to).addAllAllowed(allowed).build()));
+    }
+
+    private PathResult callEngine(Supplier<PathReply> call) {
+        return Try.ofSupplier(call)
+                .map(this::toResult)
+                .recover(StatusRuntimeException.class, e -> fail(degradedReason(e)))
+                .get();
+    }
+
+    private static String degradedReason(StatusRuntimeException e) {
+        String reason = switch (e.getStatus().getCode()) {
+            case RESOURCE_EXHAUSTED, DEADLINE_EXCEEDED -> "busy";
+            case UNAVAILABLE -> "loading";
+            default -> throw e;
+        };
+        log.warn("[path] engine call degraded to '{}': {}", reason, e.getStatus());
+        return reason;
     }
 
     private PathResult toResult(PathReply reply) {

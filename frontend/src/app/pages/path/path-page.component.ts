@@ -77,6 +77,7 @@ export class PathPageComponent implements OnInit {
   reasonText(reason: string | null): string {
     switch (reason) {
       case 'loading': return 'Graph is reloading. Please try again in a moment.';
+      case 'busy': return 'Service is busy right now — try again in a moment.';
       case 'unreachable': return 'No path — these films aren’t connected.';
       case 'budget': return 'These films are too far apart to connect quickly.';
       case 'not_found': return 'Film not found.';
