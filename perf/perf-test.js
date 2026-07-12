@@ -32,7 +32,7 @@ const SEARCH_TERMS = [
   'game', 'story', 'summer', 'winter', 'ghost', 'blue', 'red', 'american', 'paris', 'tokyo',
 ];
 
-const UPLOAD_START_S = 120;
+const UPLOAD_START_S = 60;
 const RECS_START_S = UPLOAD_START_S + Math.ceil(SLO_UPLOAD_MS / 1000) + 10;
 
 const readScenarios = MODE === 'stress'
@@ -53,9 +53,9 @@ const readScenarios = MODE === 'stress'
     }
   : {
       search: burst('searchTest', PARALLEL, '0s'),
-      film_detail: burst('filmDetailTest', PARALLEL, '300s'),
-      film_graph: burst('filmGraphTest', PARALLEL, '600s'),
-      shortest_path: burst('pathTest', PARALLEL, '900s'),
+      film_detail: burst('filmDetailTest', PARALLEL, '15s'),
+      film_graph: burst('filmGraphTest', PARALLEL, '30s'),
+      shortest_path: burst('pathTest', PARALLEL, '45s'),
     };
 
 export const options = {
@@ -133,11 +133,6 @@ function seedFilmPool() {
     .map(k => filmByKey[k]);
 }
 
-/**
- * Deterministic per (RUN_ID, setIndex, pool): setup() hashes the CSV without
- * storing it, and upload VUs regenerate the identical bytes. This keeps the
- * per-VU copy of setup data tiny, which is what makes large-VU runs feasible.
- */
 function buildCsv(pool, setIndex) {
   const rng = mulberry32(seedHash(`${RUN_ID}:${setIndex}`));
   const films = shuffled(pool, rng).slice(0, Math.min(SET_SIZE, pool.length));
