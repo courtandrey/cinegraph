@@ -193,8 +193,10 @@ public class EdgeQueryRepository {
     }
 
     private static Field<Double> ratingCoef(Field<Float> rating) {
-        return when(rating.isNull(), 1.0)
-                .otherwise(rating.cast(Double.class).minus(2.5).mul(4.0).plus(1.0));
+        Field<Double> line = rating.cast(Double.class).minus(2.75).mul(4.0);
+        return when(rating.isNull(), 0.5)
+                .when(rating.gt(2.75f), line.minus(0.5))
+                .otherwise(line.plus(0.5));
     }
 
     public List<SetEdge> recommendationContributions(String hash, long recId) {

@@ -214,12 +214,12 @@ class GraphApiTest {
         mvc.perform(get("/api/letterboxd/recs/recommendations"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(4)))
-                .andExpect(jsonPath("$[*].id", contains(700, 701, 100, 702)))
+                .andExpect(jsonPath("$[*].id", contains(700, 100, 701, 702)))
                 .andExpect(jsonPath("$[0].title").value("John Wick"))
-                .andExpect(jsonPath("$[0].inScore", closeTo(110.0, 1e-4)))
-                .andExpect(jsonPath("$[1].inScore", closeTo(60.0, 1e-4)))
-                .andExpect(jsonPath("$[2].inScore", closeTo(55.0, 1e-4)))
-                .andExpect(jsonPath("$[3].inScore", closeTo(10.0, 1e-4)));
+                .andExpect(jsonPath("$[0].inScore", closeTo(85.0, 1e-4)))
+                .andExpect(jsonPath("$[1].inScore", closeTo(42.5, 1e-4)))
+                .andExpect(jsonPath("$[2].inScore", closeTo(20.0, 1e-4)))
+                .andExpect(jsonPath("$[3].inScore", closeTo(5.0, 1e-4)));
     }
 
     @Test
@@ -228,7 +228,7 @@ class GraphApiTest {
         mvc.perform(get("/api/letterboxd/recs/recommendations").param("limit", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[*].id", contains(700, 701)));
+                .andExpect(jsonPath("$[*].id", contains(700, 100)));
     }
 
     @Test
@@ -266,40 +266,40 @@ class GraphApiTest {
         mvc.perform(get("/api/letterboxd/recs/recommendations").param("invert", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(5)))
-                .andExpect(jsonPath("$[*].id", contains(800, 702, 100, 701, 700)))
+                .andExpect(jsonPath("$[*].id", contains(800, 702, 701, 100, 700)))
                 .andExpect(jsonPath("$[0].title").value("Jupiter Ascending"))
-                .andExpect(jsonPath("$[0].inScore", closeTo(-50.0, 1e-4)))
-                .andExpect(jsonPath("$[4].inScore", closeTo(110.0, 1e-4)));
+                .andExpect(jsonPath("$[0].inScore", closeTo(-65.0, 1e-4)))
+                .andExpect(jsonPath("$[4].inScore", closeTo(85.0, 1e-4)));
     }
 
     @Test
     void recommendationBreakdown_showsInScoreTimesCoefPerFilmAndTotal() throws Exception {
         insertRecommendationFixture();
-        // 701 links to 603 (5★ → coef 11, edge 10 → 110) and 604 (1★ → coef −5, edge 10 → −50).
+        // 701 links to 603 (5★ → coef 8.5, edge 10 → 85) and 604 (1★ → coef −6.5, edge 10 → −65).
         mvc.perform(get("/api/letterboxd/recs/recommendations/701/breakdown"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.movieId").value(701))
-                .andExpect(jsonPath("$.total", closeTo(60.0, 1e-4)))
+                .andExpect(jsonPath("$.total", closeTo(20.0, 1e-4)))
                 .andExpect(jsonPath("$.contributions", hasSize(2)))
                 .andExpect(jsonPath("$.contributions[0].movieId").value(603))
                 .andExpect(jsonPath("$.contributions[0].inScore", closeTo(10.0, 1e-4)))
                 .andExpect(jsonPath("$.contributions[0].rating", closeTo(5.0, 1e-4)))
-                .andExpect(jsonPath("$.contributions[0].coef", closeTo(11.0, 1e-4)))
-                .andExpect(jsonPath("$.contributions[0].contribution", closeTo(110.0, 1e-4)))
+                .andExpect(jsonPath("$.contributions[0].coef", closeTo(8.5, 1e-4)))
+                .andExpect(jsonPath("$.contributions[0].contribution", closeTo(85.0, 1e-4)))
                 .andExpect(jsonPath("$.contributions[1].movieId").value(604))
-                .andExpect(jsonPath("$.contributions[1].contribution", closeTo(-50.0, 1e-4)));
+                .andExpect(jsonPath("$.contributions[1].contribution", closeTo(-65.0, 1e-4)));
     }
 
     @Test
-    void recommendationBreakdown_unratedFilmUsesCoefOne() throws Exception {
+    void recommendationBreakdown_unratedFilmUsesNeutralCoef() throws Exception {
         insertRecommendationFixture();
-        // 702 links only to 605 (unrated → coef 1, edge 10 → 10).
+        // 702 links only to 605 (unrated → coef 0.5, edge 10 → 5).
         mvc.perform(get("/api/letterboxd/recs/recommendations/702/breakdown"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total", closeTo(10.0, 1e-4)))
+                .andExpect(jsonPath("$.total", closeTo(5.0, 1e-4)))
                 .andExpect(jsonPath("$.contributions", hasSize(1)))
                 .andExpect(jsonPath("$.contributions[0].rating").doesNotExist())
-                .andExpect(jsonPath("$.contributions[0].coef", closeTo(1.0, 1e-4)));
+                .andExpect(jsonPath("$.contributions[0].coef", closeTo(0.5, 1e-4)));
     }
 
     @Test
@@ -313,10 +313,10 @@ class GraphApiTest {
     void recenter_recommendation_ranksNeighboursByContributionNotInScore() throws Exception {
         insertRecommendationFixture();
         insertMovie(710, "Contribution Test", 2020);
-        insertScoreOnlyEdge(603, 710, 5f);    // 603 is 5★ → coef 11 → contribution 55
-        insertScoreOnlyEdge(605, 710, 20f);   // 605 unrated → coef 1 → contribution 20
+        insertScoreOnlyEdge(603, 710, 5f);    // 603 is 5★ → coef 8.5 → contribution 42.5
+        insertScoreOnlyEdge(605, 710, 20f);   // 605 unrated → coef 0.5 → contribution 10
 
-        // 605 has the higher in-score (20 vs 5) but 603 the higher contribution (55 vs 20);
+        // 605 has the higher in-score (20 vs 5) but 603 the higher contribution (42.5 vs 10);
         // capping to one neighbour must keep 603, proving selection is by contribution.
         mvc.perform(post("/api/letterboxd/recenter")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -331,8 +331,8 @@ class GraphApiTest {
     void recenter_notRecommended_leadsWithMostNegativeContributor() throws Exception {
         insertRecommendationFixture();
         insertMovie(711, "Not Recommended", 2021);
-        insertScoreOnlyEdge(603, 711, 1f);    // 5★ → coef 11 → contribution +11
-        insertScoreOnlyEdge(604, 711, 10f);   // 1★ → coef −5 → contribution −50 (total −39 < 0)
+        insertScoreOnlyEdge(603, 711, 1f);    // 5★ → coef 8.5 → contribution +8.5
+        insertScoreOnlyEdge(604, 711, 10f);   // 1★ → coef −6.5 → contribution −65 (total −56.5 < 0)
 
         // Net-negative total, so the deep-dive leads with the most negative contributor (604),
         // not the positive one (603) that a by-contribution-desc order would surface.
@@ -384,7 +384,7 @@ class GraphApiTest {
         insertMovie(702, "Cloud Atlas", 2012);
         insertMovie(800, "Jupiter Ascending", 2015);
 
-        // coef: 603 rated 5.0 -> 11, 604 rated 1.0 -> -5, 605 unrated -> 1
+        // coef: 603 rated 5.0 -> 8.5, 604 rated 1.0 -> -6.5, 605 unrated -> 0.5
         insertSetEntry("recs", 603, 5.0f);
         insertSetEntry("recs", 604, 1.0f);
         insertSetEntry("recs", 605, null);

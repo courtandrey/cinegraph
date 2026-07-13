@@ -162,7 +162,9 @@ public class LetterboxdGraphService {
 
     /** Mirrors the SQL {@code ratingCoef} in EdgeQueryRepository — keep the two in sync. */
     private static double ratingCoef(Double rating) {
-        return rating == null ? 1.0 : 1.0 + (rating - 2.5) * 4.0;
+        if (rating == null) return 0.5;
+        double line = (rating - 2.75) * 4.0;
+        return rating > 2.75 ? line - 0.5 : line + 0.5;
     }
 
     private double recommendationTotal(String hash, long movieId) {

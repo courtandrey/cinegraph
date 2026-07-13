@@ -21,8 +21,8 @@ export class FilmPanelComponent {
 
   get coefTooltip(): string {
     return this.recContribution?.rating == null
-      ? 'Unrated film → coefficient 1'
-      : 'coefficient = 1 + (rating − 2.5) × 4';
+      ? 'Unrated film → coefficient 0.5'
+      : 'coefficient = 4 × (rating − 2.75), damped 0.5 toward zero';
   }
 
   @Output() reCenter = new EventEmitter<number>();
