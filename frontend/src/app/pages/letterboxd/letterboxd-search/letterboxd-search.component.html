@@ -1,5 +1,6 @@
 <div class="modal-backdrop" (mousedown)="onBackdropMouseDown($event)" (click)="onBackdropClick($event)">
   <div class="modal" (click)="$event.stopPropagation()">
+    <button class="modal-collapse" (click)="closed.emit()">▾ Collapse</button>
     <div class="modal-header">
       <span class="modal-title">Find a film in your graph</span>
       <button class="modal-close" (click)="closed.emit()" aria-label="Close">✕</button>

@@ -24,6 +24,10 @@
   overflow: hidden;
 }
 
+.modal-collapse {
+  display: none;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -150,4 +154,43 @@
   padding: 8px 14px 16px;
   color: $text;
   font-size: 13px;
+}
+
+@media (max-width: 820px) {
+  .modal-backdrop {
+    padding: 0;
+    background: $panel;
+  }
+
+  .modal {
+    max-width: none;
+    max-height: none;
+    height: 100%;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .modal-collapse {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+    width: 100%;
+    padding: 11px;
+    background: $panel-2;
+    border: none;
+    border-bottom: 1px solid $border;
+    color: $text-bright;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .modal-close {
+    display: none;
+  }
 }
