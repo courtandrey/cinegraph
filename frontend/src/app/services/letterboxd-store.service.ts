@@ -15,11 +15,25 @@ export class LetterboxdStore {
   readonly count = computed(() => this._graphs().length);
   readonly current = computed(() => this._graphs()[this._index()] ?? null);
 
+  private recsScrollKey: string | null = null;
+  private recsScrollTop = 0;
+
+  rememberRecsScroll(key: string, top: number): void {
+    this.recsScrollKey = key;
+    this.recsScrollTop = top;
+  }
+
+  recsScroll(key: string): number {
+    return this.recsScrollKey === key ? this.recsScrollTop : 0;
+  }
+
   set(hash: string, graphs: LetterboxdGraph[]): void {
     this._hash.set(hash);
     this._graphs.set(graphs);
     this._index.set(0);
     this._inScoreThreshold.set(0);
+    this.recsScrollKey = null;
+    this.recsScrollTop = 0;
   }
 
   setInScoreThreshold(v: number): void {

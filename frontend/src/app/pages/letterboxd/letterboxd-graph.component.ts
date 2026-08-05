@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GraphCanvasComponent } from '../graph/graph-canvas/graph-canvas.component';
 import { LetterboxdSearchComponent } from './letterboxd-search/letterboxd-search.component';
@@ -59,6 +59,19 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly recsInvert = signal(false);
   private recsKey: string | null = null;
   private recsSeq = 0;
+
+  readonly currentRecsKey = computed(() => {
+    const scope = this.recsScope();
+    const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
+    return `${scope}:${graphId ?? ''}:${this.recsInvert()}`;
+  });
+
+  private recsScrollEl: HTMLElement | null = null;
+
+  @ViewChild('recsScroll')
+  set recsScrollRef(ref: ElementRef<HTMLElement> | undefined) {
+    this.recsScrollEl = ref?.nativeElement ?? null;
+  }
 
   readonly detailReturn = signal<DetailReturn>(null);
   readonly pathReturn = signal<{ nodeId: number; detailReturn: DetailReturn } | null>(null);
@@ -142,6 +155,24 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
       const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
       untracked(() => this.ensureRecs(scope, graphId, invert));
     });
+
+    effect(() => {
+      const ready = this.recsOpen() && this.recs() !== null;
+      const key = this.currentRecsKey();
+      if (!ready) return;
+      untracked(() => this.restoreRecsScroll(key));
+    });
+  }
+
+  private restoreRecsScroll(key: string): void {
+    const top = this.store.recsScroll(key);
+    requestAnimationFrame(() => {
+      if (this.recsScrollEl) this.recsScrollEl.scrollTop = top;
+    });
+  }
+
+  onRecsScroll(el: EventTarget | null): void {
+    if (el instanceof HTMLElement) this.store.rememberRecsScroll(this.currentRecsKey(), el.scrollTop);
   }
 
   private ensureRecs(scope: 'all' | 'component', graphId: number | null, invert: boolean): void {

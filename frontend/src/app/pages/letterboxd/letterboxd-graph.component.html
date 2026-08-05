@@ -71,7 +71,7 @@
       <aside class="side-panel recs-panel" [class.inverted]="recsInvert()">
         <button class="panel-collapse" (click)="recsOpen.set(false)">▾ Collapse</button>
 
-        <div class="detail-scroll">
+        <div class="detail-scroll" #recsScroll (scroll)="onRecsScroll($event.target)">
           <div class="recs-head">
             <span class="recs-summary">{{ recsInvert() ? 'Least recommended' : 'Top recommendations' }}</span>
             <button class="invert-btn" [class.active]="recsInvert()" (click)="toggleInvert()"
