@@ -43,7 +43,7 @@ public class LetterboxdGraphService {
     private static final int MAX_LIMIT = 100;
     private static final int DEFAULT_LIMIT = 40;
 
-    private final LetterboxdClient client;
+    private final LetterboxdTmdbResolver tmdbResolver;
     private final MovieQueryRepository movieRepo;
     private final EdgeQueryRepository edgeRepo;
     private final LetterboxdSetRepository setRepo;
@@ -55,13 +55,13 @@ public class LetterboxdGraphService {
     private final PathService pathService;
     private final EngineRecommender engineRecommender;
 
-    public LetterboxdGraphService(LetterboxdClient client, MovieQueryRepository movieRepo,
+    public LetterboxdGraphService(LetterboxdTmdbResolver tmdbResolver, MovieQueryRepository movieRepo,
                                   EdgeQueryRepository edgeRepo, LetterboxdSetRepository setRepo,
                                   TopReasonResolver topReason, GraphScoring graphScoring,
                                   GraphScoringProperties scoringProps, ObjectMapper mapper,
                                   LetterboxdProperties props, PathService pathService,
                                   EngineRecommender engineRecommender) {
-        this.client = client;
+        this.tmdbResolver = tmdbResolver;
         this.movieRepo = movieRepo;
         this.edgeRepo = edgeRepo;
         this.setRepo = setRepo;
@@ -299,12 +299,7 @@ public class LetterboxdGraphService {
     private Optional<Long> resolveViaUri(FilmRow row) {
         return Optional.ofNullable(row.uri())
                 .filter(Predicate.not(String::isBlank))
-                .flatMap(client::filmPage)
-                .flatMap(LetterboxdParsing::parseTmdbId)
-                .or(() -> {
-                    log.error("Could not parse tmdb id from {}", row.uri());
-                    return Optional.empty();
-                });
+                .flatMap(tmdbResolver::tmdbId);
     }
 
     private Assembled assemble(List<Long> movieIds) {
