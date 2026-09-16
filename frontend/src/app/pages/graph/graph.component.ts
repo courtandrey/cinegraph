@@ -40,6 +40,7 @@ export class GraphComponent implements OnInit, OnDestroy {
   private minScoreTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly recBreakdown = signal<RecommendationBreakdown | null>(null);
+  private readonly recCenter = signal(false);
   private recRequestSeq = 0;
 
   readonly recContribById = computed(() => {
@@ -112,6 +113,7 @@ export class GraphComponent implements OnInit, OnDestroy {
     this.route.params.subscribe(params => {
       this.hash.set(params['hash'] ?? null);
       this.centerId.set(Number(params['id']));
+      this.recCenter.set(this.route.snapshot.queryParamMap.get('rec') === '1');
       this.fetchGraph();
     });
   }
@@ -188,7 +190,7 @@ export class GraphComponent implements OnInit, OnDestroy {
     const hash = this.hash();
     const seq = ++this.recRequestSeq;
     this.recBreakdown.set(null);
-    if (!hash) return;
+    if (!hash || !this.recCenter()) return;
     this.api.letterboxdRecommendationBreakdown(hash, id).subscribe({
       next: bd => { if (seq === this.recRequestSeq) this.recBreakdown.set(bd); },
       error: () => { if (seq === this.recRequestSeq) this.recBreakdown.set(null); }
@@ -283,7 +285,6 @@ export class GraphComponent implements OnInit, OnDestroy {
     return COMPONENT_DEFAULTS.get(code) ?? this.defaultWeights().get(code) ?? 0.5;
   }
 
-  /** Breakdown built from the already re-scored payload, so the panel matches the canvas. */
   private localBreakdown(nodeId: number): EdgeBreakdown | null {
     const g = this.graph();
     const centerId = this.centerId();

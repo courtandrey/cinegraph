@@ -242,7 +242,8 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (id == null || !hash || this.selectedNotConnected()) return;
     this.graphStore.setMinScore(0);
     this.graphStore.resetLimit();
-    this.router.navigate(['/letterboxd', hash, 'film', id]);
+    this.router.navigate(['/letterboxd', hash, 'film', id],
+      this.isRecommendation() ? { queryParams: { rec: 1 } } : {});
   }
 
   setThreshold(v: number): void {
