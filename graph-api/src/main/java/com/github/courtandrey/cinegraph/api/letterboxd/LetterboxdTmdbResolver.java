@@ -17,7 +17,7 @@ public class LetterboxdTmdbResolver {
         this.client = client;
     }
 
-    @Cacheable(CacheConfig.LETTERBOXD_TMDB_ID)
+    @Cacheable(value = CacheConfig.LETTERBOXD_TMDB_ID, unless = "#result == null")
     public Optional<Long> tmdbId(String filmUri) {
         return client.filmPage(filmUri)
                 .flatMap(LetterboxdParsing::parseTmdbId)
