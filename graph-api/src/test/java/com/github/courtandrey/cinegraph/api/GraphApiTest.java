@@ -1,5 +1,8 @@
 package com.github.courtandrey.cinegraph.api;
 
+import com.github.courtandrey.cinegraph.api.domain.LetterboxdUriOutcome;
+import com.github.courtandrey.cinegraph.api.domain.UriResolution;
+import com.github.courtandrey.cinegraph.api.repo.LetterboxdUriRepository;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -42,11 +45,12 @@ class GraphApiTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired LetterboxdUriRepository uriRepo;
 
     @BeforeEach
     void seed() {
         jdbc.execute("TRUNCATE movie, person, credit, genre, keyword, " +
-                     "movie_genre, movie_keyword, edge, letterboxd_set CASCADE");
+                     "movie_genre, movie_keyword, edge, letterboxd_set, letterboxd_uri CASCADE");
         insertFixture();
     }
 
@@ -395,6 +399,43 @@ class GraphApiTest {
         insertScoreOnlyEdge(100, 603, 5f);
         insertScoreOnlyEdge(605, 702, 10f);
         insertScoreOnlyEdge(604, 800, 10f);
+    }
+
+    // ── letterboxd uri cache ──────────────────────────────────────────
+
+    @Test
+    void uriCache_storesResolvedLookup() {
+        uriRepo.save("https://boxd.it/2a1m", UriResolution.resolved(603));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT outcome FROM letterboxd_uri WHERE uri = 'https://boxd.it/2a1m'", String.class))
+                .isEqualTo("RESOLVED");
+        assertThat(uriRepo.find("https://boxd.it/2a1m").orElseThrow().movieId()).contains(603L);
+    }
+
+    @Test
+    void uriCache_storesVerdictThatUriHasNoMovie() {
+        uriRepo.save("https://boxd.it/ZEHA", UriResolution.NO_MOVIE);
+
+        UriResolution found = uriRepo.find("https://boxd.it/ZEHA").orElseThrow();
+        assertThat(found.outcome()).isEqualTo(LetterboxdUriOutcome.UNRESOLVABLE);
+        assertThat(found.movieId()).isEmpty();
+    }
+
+    @Test
+    void uriCache_unknownUriIsAbsent() {
+        assertThat(uriRepo.find("https://boxd.it/never")).isEmpty();
+    }
+
+    @Test
+    void uriCache_reresolutionOverwritesEarlierVerdict() {
+        uriRepo.save("https://boxd.it/2a1m", UriResolution.NO_MOVIE);
+        uriRepo.save("https://boxd.it/2a1m", UriResolution.resolved(604));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM letterboxd_uri WHERE uri = 'https://boxd.it/2a1m'", Integer.class))
+                .isEqualTo(1);
+        assertThat(uriRepo.find("https://boxd.it/2a1m").orElseThrow().movieId()).contains(604L);
     }
 
     private void insertSetEntry(String hash, long movieId, Float rating) {

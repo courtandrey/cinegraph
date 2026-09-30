@@ -30,12 +30,24 @@ public class LetterboxdClient {
                 .build();
     }
 
-    public Optional<String> filmPage(String uri) {
+    public Try<Optional<String>> filmPage(String uri) {
         return Try.of(() -> http.send(request(uri), HttpResponse.BodyHandlers.ofString()))
                 .andThen(resp -> log.debug("Response from letterboxd {}", resp.statusCode()))
-                .filter(r -> r.statusCode() == 200)
-                .map(HttpResponse::body)
-                .toJavaOptional();
+                .flatMap(LetterboxdClient::body);
+    }
+
+    private static Try<Optional<String>> body(HttpResponse<String> response) {
+        return switch (response.statusCode()) {
+            case 200 -> Try.success(Optional.of(response.body()));
+            case 404, 410 -> Try.success(Optional.empty());
+            default -> Try.failure(new UnreadablePageException(response.statusCode()));
+        };
+    }
+
+    public static class UnreadablePageException extends RuntimeException {
+        public UnreadablePageException(int statusCode) {
+            super("Letterboxd responded " + statusCode);
+        }
     }
 
     private HttpRequest request(String url) {

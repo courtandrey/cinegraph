@@ -136,3 +136,10 @@ CREATE TABLE letterboxd_set (
     graph_id BIGINT,
     PRIMARY KEY (hash, movie_id)
 );
+
+CREATE TABLE letterboxd_uri (
+    uri         VARCHAR PRIMARY KEY,
+    outcome     VARCHAR NOT NULL,
+    movie_id    BIGINT,
+    resolved_at TIMESTAMPTZ NOT NULL
+);
