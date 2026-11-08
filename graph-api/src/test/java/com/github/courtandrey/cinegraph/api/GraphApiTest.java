@@ -277,6 +277,23 @@ class GraphApiTest {
     }
 
     @Test
+    void recommendations_excludeShorts_dropsFilmsUnderTwentyMinutes() throws Exception {
+        insertRecommendationFixture();
+        // 700 is a short (15 min); 702 runs exactly 20 min; 701 has an unknown (0) runtime.
+        jdbc.update("UPDATE movie SET runtime = 15 WHERE movie_id = 700");
+        jdbc.update("UPDATE movie SET runtime = 20 WHERE movie_id = 702");
+        jdbc.update("UPDATE movie SET runtime = 0 WHERE movie_id = 701");
+
+        mvc.perform(get("/api/letterboxd/recs/recommendations").param("excludeShorts", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(100, 701, 702)));
+
+        mvc.perform(get("/api/letterboxd/recs/recommendations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(700, 100, 701, 702)));
+    }
+
+    @Test
     void recommendationBreakdown_showsInScoreTimesCoefPerFilmAndTotal() throws Exception {
         insertRecommendationFixture();
         // 701 links to 603 (5★ → coef 8.5, edge 10 → 85) and 604 (1★ → coef −6.5, edge 10 → −65).

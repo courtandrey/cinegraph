@@ -42,6 +42,8 @@ public class LetterboxdGraphService {
 
     private static final int MAX_LIMIT = 100;
     private static final int DEFAULT_LIMIT = 40;
+    private static final int SHORTS_OVERFETCH = 4;
+    private static final int MAX_ENGINE_FETCH = 6_400;
 
     private final LetterboxdTmdbResolver tmdbResolver;
     private final MovieQueryRepository movieRepo;
@@ -107,14 +109,15 @@ public class LetterboxdGraphService {
                 .toList();
     }
 
-    public List<GraphNode> recommendations(String hash, Long graphId, boolean invert, int limitReq) {
+    public List<GraphNode> recommendations(String hash, Long graphId, boolean invert,
+                                           boolean excludeShorts, int limitReq) {
         int limit = Math.clamp(limitReq, 1, MAX_LIMIT);
         List<SetFilm> films = setRepo.loadSetFilms(hash);
         if (films.isEmpty()) return List.of();
 
         List<EdgeQueryRepository.Recommendation> recs =
-                engineRecommendations(films, graphId, invert, limit)
-                        .orElseGet(() -> edgeRepo.topRecommendations(hash, graphId, invert, limit));
+                engineRecommendations(films, graphId, invert, excludeShorts, limit)
+                        .orElseGet(() -> edgeRepo.topRecommendations(hash, graphId, invert, excludeShorts, limit));
 
         Map<Long, GraphNode> nodeById = movieRepo
                 .findNodesByIds(recs.stream().map(EdgeQueryRepository.Recommendation::movieId).toList())
@@ -128,17 +131,36 @@ public class LetterboxdGraphService {
     }
 
     private Optional<List<EdgeQueryRepository.Recommendation>> engineRecommendations(
-            List<SetFilm> films, Long graphId, boolean invert, int limit) {
+            List<SetFilm> films, Long graphId, boolean invert, boolean excludeShorts, int limit) {
         List<EngineRecommender.Seed> seeds = films.stream()
                 .filter(f -> graphId == null || Objects.equals(f.graphId(), graphId))
                 .map(f -> new EngineRecommender.Seed(f.movieId(),
                         ratingCoef(f.rating() == null ? null : f.rating().doubleValue())))
                 .toList();
         List<Long> exclude = films.stream().map(SetFilm::movieId).toList();
-        return Try.of(() -> engineRecommender.recommend(seeds, exclude, limit, invert))
+        return Try.of(() -> excludeShorts
+                        ? engineFeatureLength(seeds, exclude, invert, limit, limit * SHORTS_OVERFETCH)
+                        : engineRecommender.recommend(seeds, exclude, limit, invert))
                 .onFailure(e -> log.warn("[recs] engine unavailable, using SQL fallback: {}",
                         e.getMessage()))
                 .getOrElse(Optional.empty());
+    }
+
+    private Optional<List<EdgeQueryRepository.Recommendation>> engineFeatureLength(
+            List<EngineRecommender.Seed> seeds, List<Long> exclude, boolean invert, int limit, int fetch) {
+        return engineRecommender.recommend(seeds, exclude, fetch, invert).flatMap(page -> {
+            Set<Long> shorts = movieRepo.shortFilmIds(
+                    page.stream().map(EdgeQueryRepository.Recommendation::movieId).toList());
+            List<EdgeQueryRepository.Recommendation> kept = page.stream()
+                    .filter(r -> !shorts.contains(r.movieId()))
+                    .limit(limit)
+                    .toList();
+            boolean settled = kept.size() >= limit || page.size() < fetch || fetch >= MAX_ENGINE_FETCH;
+            return settled
+                    ? Optional.of(kept)
+                    : engineFeatureLength(seeds, exclude, invert, limit,
+                            Math.min(fetch * SHORTS_OVERFETCH, MAX_ENGINE_FETCH));
+        });
     }
 
     public Optional<RecommendationBreakdown> recommendationBreakdown(String hash, long movieId) {

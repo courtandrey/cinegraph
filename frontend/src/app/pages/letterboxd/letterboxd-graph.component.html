@@ -92,6 +92,11 @@
                       (click)="setRecsScope('component')">This graph</button>
             </div>
           }
+          <label class="shorts-toggle">
+            <input type="checkbox" [checked]="recsExcludeShorts()" (change)="toggleExcludeShorts()" />
+            <span class="shorts-switch" aria-hidden="true"></span>
+            <span>Exclude short films <span class="shorts-hint">(&lt;20 min)</span></span>
+          </label>
           @if (recs(); as list) {
             @if (list.length === 0) {
               <div class="recs-empty">{{ recsInvert() ? 'No films to rank were found.' : 'No film with a positive recommendation score was found.' }}</div>

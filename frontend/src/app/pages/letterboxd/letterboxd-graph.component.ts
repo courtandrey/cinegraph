@@ -57,13 +57,14 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly recsStatus = signal<'idle' | 'loading' | 'error'>('idle');
   readonly recsScope = signal<'all' | 'component'>('all');
   readonly recsInvert = signal(false);
+  readonly recsExcludeShorts = signal(false);
   private recsKey: string | null = null;
   private recsSeq = 0;
 
   readonly currentRecsKey = computed(() => {
     const scope = this.recsScope();
     const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
-    return `${scope}:${graphId ?? ''}:${this.recsInvert()}`;
+    return `${scope}:${graphId ?? ''}:${this.recsInvert()}:${this.recsExcludeShorts()}`;
   });
 
   private recsScrollEl: HTMLElement | null = null;
@@ -152,8 +153,9 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
       if (!this.recsOpen()) return;
       const scope = this.recsScope();
       const invert = this.recsInvert();
+      const excludeShorts = this.recsExcludeShorts();
       const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
-      untracked(() => this.ensureRecs(scope, graphId, invert));
+      untracked(() => this.ensureRecs(scope, graphId, invert, excludeShorts));
     });
 
     effect(() => {
@@ -175,8 +177,9 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (el instanceof HTMLElement) this.store.rememberRecsScroll(this.currentRecsKey(), el.scrollTop);
   }
 
-  private ensureRecs(scope: 'all' | 'component', graphId: number | null, invert: boolean): void {
-    const key = `${scope}:${graphId ?? ''}:${invert}`;
+  private ensureRecs(scope: 'all' | 'component', graphId: number | null, invert: boolean,
+                     excludeShorts: boolean): void {
+    const key = `${scope}:${graphId ?? ''}:${invert}:${excludeShorts}`;
     if (this.recsKey === key && (this.recs() !== null || this.recsStatus() === 'loading')) return;
     const hash = this.store.hash();
     if (!hash) return;
@@ -184,7 +187,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.recs.set(null);
     this.recsStatus.set('loading');
     const seq = ++this.recsSeq;
-    this.api.letterboxdRecommendations(hash, 25, graphId ?? undefined, invert).subscribe({
+    this.api.letterboxdRecommendations(hash, 25, graphId ?? undefined, invert, excludeShorts).subscribe({
       next: list => { if (seq === this.recsSeq) { this.recs.set(list); this.recsStatus.set('idle'); } },
       error: () => { if (seq === this.recsSeq) this.recsStatus.set('error'); }
     });
@@ -276,6 +279,10 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   toggleInvert(): void {
     this.recsInvert.update(v => !v);
+  }
+
+  toggleExcludeShorts(): void {
+    this.recsExcludeShorts.update(v => !v);
   }
 
   onRecTap(rec: GraphNode): void {

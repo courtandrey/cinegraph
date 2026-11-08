@@ -16,6 +16,8 @@ import java.util.Optional;
 
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.EDGE;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.LETTERBOXD_SET;
+import static com.github.courtandrey.cinegraph.api.jooq.Tables.MOVIE;
+import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.selectOne;
 import static org.jooq.impl.DSL.sum;
@@ -159,7 +161,8 @@ public class EdgeQueryRepository {
                         text(r.get(EDGE.COMPONENTS))));
     }
 
-    public List<Recommendation> topRecommendations(String hash, Long graphId, boolean invert, int limit) {
+    public List<Recommendation> topRecommendations(String hash, Long graphId, boolean invert,
+                                                   boolean excludeShorts, int limit) {
         var rated = LETTERBOXD_SET.as("rated");
         var owned = LETTERBOXD_SET.as("owned");
         Condition scope = graphId == null ? noCondition() : rated.GRAPH_ID.eq(graphId);
@@ -181,8 +184,14 @@ public class EdgeQueryRepository {
         Field<Long> recId = contrib.field("rec_id", Long.class);
         Field<Double> score = sum(contrib.field("contribution", Double.class)).cast(Double.class);
 
+        Condition lengthGuard = excludeShorts
+                ? notExists(selectOne().from(MOVIE)
+                        .where(MOVIE.MOVIE_ID.eq(recId).and(MovieQueryRepository.SHORT_FILM)))
+                : noCondition();
+
         var grouped = ctx.select(recId, score.as("score"))
                 .from(contrib)
+                .where(lengthGuard)
                 .groupBy(recId)
                 .having(invert ? noCondition() : score.gt(0.0));
         return grouped.orderBy(invert ? score.asc() : score.desc())

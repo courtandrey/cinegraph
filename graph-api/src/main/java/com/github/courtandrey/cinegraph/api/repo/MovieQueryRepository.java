@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.GENRE;
 import static com.github.courtandrey.cinegraph.api.jooq.Tables.LETTERBOXD_SET;
@@ -25,6 +26,11 @@ public class MovieQueryRepository {
 
     private static final int MAX_SEARCH = 50;
     private static final double FUZZY_THRESHOLD = 0.35;
+
+    private static final short SHORT_FILM_MAX_MINUTES = 20;
+
+    public static final Condition SHORT_FILM =
+            MOVIE.RUNTIME.gt((short) 0).and(MOVIE.RUNTIME.lt(SHORT_FILM_MAX_MINUTES));
 
     private final DSLContext ctx;
 
@@ -163,6 +169,14 @@ public class MovieQueryRepository {
                 .from(MOVIE)
                 .where(MOVIE.MOVIE_ID.in(ids))
                 .fetch(r -> new GraphNode(r.value1(), r.value2(), toInteger(r.value3()), r.value4(), 0.0));
+    }
+
+    public Set<Long> shortFilmIds(Collection<Long> ids) {
+        if (ids.isEmpty()) return Set.of();
+        return ctx.select(MOVIE.MOVIE_ID)
+                .from(MOVIE)
+                .where(MOVIE.MOVIE_ID.in(ids).and(SHORT_FILM))
+                .fetchSet(MOVIE.MOVIE_ID);
     }
 
     private static Integer toInteger(Short s) {
