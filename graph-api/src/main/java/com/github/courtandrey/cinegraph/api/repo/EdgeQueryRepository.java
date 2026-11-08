@@ -162,7 +162,7 @@ public class EdgeQueryRepository {
     }
 
     public List<Recommendation> topRecommendations(String hash, Long graphId, boolean invert,
-                                                   boolean excludeShorts, int limit) {
+                                                   int minRuntime, int limit) {
         var rated = LETTERBOXD_SET.as("rated");
         var owned = LETTERBOXD_SET.as("owned");
         Condition scope = graphId == null ? noCondition() : rated.GRAPH_ID.eq(graphId);
@@ -184,9 +184,9 @@ public class EdgeQueryRepository {
         Field<Long> recId = contrib.field("rec_id", Long.class);
         Field<Double> score = sum(contrib.field("contribution", Double.class)).cast(Double.class);
 
-        Condition lengthGuard = excludeShorts
+        Condition lengthGuard = minRuntime > 0
                 ? notExists(selectOne().from(MOVIE)
-                        .where(MOVIE.MOVIE_ID.eq(recId).and(MovieQueryRepository.SHORT_FILM)))
+                        .where(MOVIE.MOVIE_ID.eq(recId).and(MovieQueryRepository.runsShorterThan(minRuntime))))
                 : noCondition();
 
         var grouped = ctx.select(recId, score.as("score"))

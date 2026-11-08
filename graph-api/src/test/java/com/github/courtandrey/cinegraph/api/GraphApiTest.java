@@ -277,16 +277,25 @@ class GraphApiTest {
     }
 
     @Test
-    void recommendations_excludeShorts_dropsFilmsUnderTwentyMinutes() throws Exception {
+    void recommendations_minRuntime_dropsFilmsShorterThanThreshold() throws Exception {
         insertRecommendationFixture();
-        // 700 is a short (15 min); 702 runs exactly 20 min; 701 has an unknown (0) runtime.
+        // 700 runs 15 min, 702 runs 40 min, 100 runs 95 min; 701 has an unknown (0) runtime.
         jdbc.update("UPDATE movie SET runtime = 15 WHERE movie_id = 700");
-        jdbc.update("UPDATE movie SET runtime = 20 WHERE movie_id = 702");
+        jdbc.update("UPDATE movie SET runtime = 40 WHERE movie_id = 702");
+        jdbc.update("UPDATE movie SET runtime = 95 WHERE movie_id = 100");
         jdbc.update("UPDATE movie SET runtime = 0 WHERE movie_id = 701");
 
-        mvc.perform(get("/api/letterboxd/recs/recommendations").param("excludeShorts", "true"))
+        mvc.perform(get("/api/letterboxd/recs/recommendations").param("minRuntime", "20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].id", contains(100, 701, 702)));
+
+        mvc.perform(get("/api/letterboxd/recs/recommendations").param("minRuntime", "40"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(100, 701, 702)));
+
+        mvc.perform(get("/api/letterboxd/recs/recommendations").param("minRuntime", "60"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(100, 701)));
 
         mvc.perform(get("/api/letterboxd/recs/recommendations"))
                 .andExpect(status().isOk())

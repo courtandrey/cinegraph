@@ -19,6 +19,7 @@ type DetailReturn = 'recs' | null;
 
 const POSTER_W342 = 'https://image.tmdb.org/t/p/w342';
 const POSTER_W92 = 'https://image.tmdb.org/t/p/w92';
+const MIN_RUNTIME_STEPS = [0, 5, 10, 20, 30, 40, 50, 60];
 
 @Component({
   selector: 'app-letterboxd-graph',
@@ -57,14 +58,16 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly recsStatus = signal<'idle' | 'loading' | 'error'>('idle');
   readonly recsScope = signal<'all' | 'component'>('all');
   readonly recsInvert = signal(false);
-  readonly recsExcludeShorts = signal(false);
+  readonly minRuntimeSteps = MIN_RUNTIME_STEPS;
+  readonly recsMinRuntime = signal(0);
+  readonly minRuntimeDisplay = signal(0);
   private recsKey: string | null = null;
   private recsSeq = 0;
 
   readonly currentRecsKey = computed(() => {
     const scope = this.recsScope();
     const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
-    return `${scope}:${graphId ?? ''}:${this.recsInvert()}:${this.recsExcludeShorts()}`;
+    return `${scope}:${graphId ?? ''}:${this.recsInvert()}:${this.recsMinRuntime()}`;
   });
 
   private recsScrollEl: HTMLElement | null = null;
@@ -153,9 +156,9 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
       if (!this.recsOpen()) return;
       const scope = this.recsScope();
       const invert = this.recsInvert();
-      const excludeShorts = this.recsExcludeShorts();
+      const minRuntime = this.recsMinRuntime();
       const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
-      untracked(() => this.ensureRecs(scope, graphId, invert, excludeShorts));
+      untracked(() => this.ensureRecs(scope, graphId, invert, minRuntime));
     });
 
     effect(() => {
@@ -178,8 +181,8 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   }
 
   private ensureRecs(scope: 'all' | 'component', graphId: number | null, invert: boolean,
-                     excludeShorts: boolean): void {
-    const key = `${scope}:${graphId ?? ''}:${invert}:${excludeShorts}`;
+                     minRuntime: number): void {
+    const key = `${scope}:${graphId ?? ''}:${invert}:${minRuntime}`;
     if (this.recsKey === key && (this.recs() !== null || this.recsStatus() === 'loading')) return;
     const hash = this.store.hash();
     if (!hash) return;
@@ -187,7 +190,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.recs.set(null);
     this.recsStatus.set('loading');
     const seq = ++this.recsSeq;
-    this.api.letterboxdRecommendations(hash, 25, graphId ?? undefined, invert, excludeShorts).subscribe({
+    this.api.letterboxdRecommendations(hash, 25, graphId ?? undefined, invert, minRuntime).subscribe({
       next: list => { if (seq === this.recsSeq) { this.recs.set(list); this.recsStatus.set('idle'); } },
       error: () => { if (seq === this.recsSeq) this.recsStatus.set('error'); }
     });
@@ -281,8 +284,17 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.recsInvert.update(v => !v);
   }
 
-  toggleExcludeShorts(): void {
-    this.recsExcludeShorts.update(v => !v);
+  previewMinRuntime(step: number): void {
+    this.minRuntimeDisplay.set(MIN_RUNTIME_STEPS[step] ?? 0);
+  }
+
+  commitMinRuntime(step: number): void {
+    this.previewMinRuntime(step);
+    this.recsMinRuntime.set(this.minRuntimeDisplay());
+  }
+
+  minRuntimeStep(): number {
+    return Math.max(0, MIN_RUNTIME_STEPS.indexOf(this.minRuntimeDisplay()));
   }
 
   onRecTap(rec: GraphNode): void {

@@ -67,11 +67,11 @@ export class MovieApiService {
     });
   }
 
-  letterboxdRecommendations(hash: string, limit = 25, graphId?: number, invert = false, excludeShorts = false) {
+  letterboxdRecommendations(hash: string, limit = 25, graphId?: number, invert = false, minRuntime = 0) {
     const params: Record<string, string> = { limit: limit.toString() };
     if (graphId != null) params['graphId'] = graphId.toString();
     if (invert) params['invert'] = 'true';
-    if (excludeShorts) params['excludeShorts'] = 'true';
+    if (minRuntime > 0) params['minRuntime'] = minRuntime.toString();
     return this.http.get<GraphNode[]>(`${this.base}/letterboxd/${hash}/recommendations`, { params });
   }
 

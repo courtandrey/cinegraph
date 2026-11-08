@@ -92,10 +92,24 @@
                       (click)="setRecsScope('component')">This graph</button>
             </div>
           }
-          <label class="shorts-toggle">
-            <input type="checkbox" [checked]="recsExcludeShorts()" (change)="toggleExcludeShorts()" />
-            <span class="shorts-switch" aria-hidden="true"></span>
-            <span>Exclude short films <span class="shorts-hint">(&lt;20 min)</span></span>
+          <label class="runtime-filter">
+            <span class="runtime-label">
+              <span>Min. length</span>
+              <span class="runtime-value" [class.active]="minRuntimeDisplay() > 0">
+                {{ minRuntimeDisplay() > 0 ? minRuntimeDisplay() + ' min' : 'Any' }}
+              </span>
+            </span>
+            <input type="range" min="0" [max]="minRuntimeSteps.length - 1" step="1"
+                   [value]="minRuntimeStep()"
+                   (input)="previewMinRuntime(+$any($event.target).value)"
+                   (change)="commitMinRuntime(+$any($event.target).value)"
+                   aria-label="Hide films shorter than"
+                   [attr.aria-valuetext]="minRuntimeDisplay() > 0 ? 'Under ' + minRuntimeDisplay() + ' minutes hidden' : 'Any length'" />
+            <span class="runtime-ticks" aria-hidden="true">
+              @for (m of minRuntimeSteps; track m) {
+                <span>{{ m === 0 ? 'Any' : m }}</span>
+              }
+            </span>
           </label>
           @if (recs(); as list) {
             @if (list.length === 0) {

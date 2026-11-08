@@ -27,11 +27,6 @@ public class MovieQueryRepository {
     private static final int MAX_SEARCH = 50;
     private static final double FUZZY_THRESHOLD = 0.35;
 
-    private static final short SHORT_FILM_MAX_MINUTES = 20;
-
-    public static final Condition SHORT_FILM =
-            MOVIE.RUNTIME.gt((short) 0).and(MOVIE.RUNTIME.lt(SHORT_FILM_MAX_MINUTES));
-
     private final DSLContext ctx;
 
     public MovieQueryRepository(DSLContext ctx) {
@@ -171,11 +166,15 @@ public class MovieQueryRepository {
                 .fetch(r -> new GraphNode(r.value1(), r.value2(), toInteger(r.value3()), r.value4(), 0.0));
     }
 
-    public Set<Long> shortFilmIds(Collection<Long> ids) {
+    public static Condition runsShorterThan(int minutes) {
+        return MOVIE.RUNTIME.gt((short) 0).and(MOVIE.RUNTIME.lt((short) minutes));
+    }
+
+    public Set<Long> idsShorterThan(Collection<Long> ids, int minutes) {
         if (ids.isEmpty()) return Set.of();
         return ctx.select(MOVIE.MOVIE_ID)
                 .from(MOVIE)
-                .where(MOVIE.MOVIE_ID.in(ids).and(SHORT_FILM))
+                .where(MOVIE.MOVIE_ID.in(ids).and(runsShorterThan(minutes)))
                 .fetchSet(MOVIE.MOVIE_ID);
     }
 
