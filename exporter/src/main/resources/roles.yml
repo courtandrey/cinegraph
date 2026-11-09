@@ -22,7 +22,7 @@ roles:
       Editing:
         jobs: ["Editor"]
   - code: COMPOSER
-    baseWeight: 6.0
+    baseWeight: 3.0
     departments:
       Sound:
         jobs: ["Original Music Composer"]

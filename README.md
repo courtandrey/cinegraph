@@ -87,8 +87,8 @@ edge table threshold-free is what lets re-weighting resurrect pairs that default
 would rank low.
 
 Role base weights (single source of truth: `exporter/src/main/resources/roles.yml`):
-`DIRECTOR 10`, `WRITER 8`, `DOP/EDITOR/COMPOSER 6`, `CAST_LEAD 5`, `PRODUCER/PRODUCTION_DESIGNER 4`,
-`COSTUME_DESIGNER 3`, `CAST_SUPPORT 2`, `EXEC_PRODUCER 1.5`, `CAST_MINOR 0.75`, `CREW_OTHER 0.5`.
+`DIRECTOR 10`, `WRITER 8`, `DOP/EDITOR 6`, `CAST_LEAD 5`, `PRODUCER/PRODUCTION_DESIGNER 4`,
+`COMPOSER/COSTUME_DESIGNER 3`, `CAST_SUPPORT 2`, `EXEC_PRODUCER 1.5`, `CAST_MINOR 0.75`, `CREW_OTHER 0.5`.
 Each person counts once per movie with their highest-weighted role; persons with more than
 800 credits are excluded as noise (TV-style mass producers).
 
