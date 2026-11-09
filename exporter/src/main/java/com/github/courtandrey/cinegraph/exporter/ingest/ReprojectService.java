@@ -47,8 +47,11 @@ public class ReprojectService {
     }
 
     public long trigger() {
-        if (runRepo.hasRunning(RunKind.FULL, RunKind.INCREMENTAL, RunKind.RETRY, RunKind.REPROJECT)) {
+        if (runRepo.hasRunning(RunKind.ingests())) {
             throw new IllegalStateException("Another load is already running");
+        }
+        if (runRepo.hasRunning(RunKind.edgeBuilds())) {
+            throw new IllegalStateException("An edge build is running; wait for it to finish");
         }
         long runId = runRepo.create(RunKind.REPROJECT);
         runRegistry.launch(runId, () -> run(runId));

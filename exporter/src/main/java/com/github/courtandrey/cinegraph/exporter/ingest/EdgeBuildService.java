@@ -7,6 +7,7 @@ import com.github.courtandrey.cinegraph.exporter.domain.RunStatus;
 import com.github.courtandrey.cinegraph.exporter.grpc.EngineClient;
 import com.github.courtandrey.cinegraph.exporter.repo.LoadRunRepository;
 import com.github.courtandrey.cinegraph.exporter.repo.PgSupport;
+import io.vavr.control.Option;
 import io.vavr.control.Try;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -86,6 +87,7 @@ public class EdgeBuildService {
     }
 
     public long triggerFullRebuild() {
+        requireNoIngestRunning();
         requireNoEdgeBuildRunning();
         long runId = runRepo.create(RunKind.EDGE_FULL);
         runRegistry.launch(runId, () -> runBuild(runId, null, runId));
@@ -93,16 +95,20 @@ public class EdgeBuildService {
     }
 
     public long triggerIncrementalEdges(long ingestRunId) {
+        requireNoIngestRunning();
         requireNoEdgeBuildRunning();
+        requireCompleteEdgeTable();
         long runId = runRepo.create(RunKind.EDGE_INCREMENTAL);
         runRegistry.launch(runId, () -> runBuild(runId, ingestRunId, runId));
         return runId;
     }
 
     public void runIncrementalEdgesSync(long ingestRunId) {
-        if (Try.run(this::requireNoEdgeBuildRunning).isFailure()) {
-            log.warn("Skipping incremental edge maintenance for ingest run {}: another edge build is running",
-                    ingestRunId);
+        Try<Void> preconditions = Try.run(this::requireNoEdgeBuildRunning)
+                .andThenTry(this::requireCompleteEdgeTable);
+        if (preconditions.isFailure()) {
+            log.warn("Skipping incremental edge maintenance for ingest run {}: {}",
+                    ingestRunId, preconditions.getCause().getMessage());
             return;
         }
         long runId = runRepo.create(RunKind.EDGE_INCREMENTAL);
@@ -110,9 +116,26 @@ public class EdgeBuildService {
     }
 
     private void requireNoEdgeBuildRunning() {
-        if (runRepo.hasRunning(RunKind.EDGE_FULL, RunKind.EDGE_INCREMENTAL)) {
+        if (runRepo.hasRunning(RunKind.edgeBuilds())) {
             throw new IllegalStateException("An edge build is already running");
         }
+    }
+
+    private void requireNoIngestRunning() {
+        if (runRepo.hasRunning(RunKind.ingests())) {
+            throw new IllegalStateException("An ingest run is in progress; wait for it to finish");
+        }
+    }
+
+    private void requireCompleteEdgeTable() {
+        if (!edgeTableComplete(runRepo.latestStatus(RunKind.EDGE_FULL))) {
+            throw new IllegalStateException(
+                    "The last full edge build did not complete, so the edge table is partial; run /admin/edges/rebuild first");
+        }
+    }
+
+    static boolean edgeTableComplete(Option<RunStatus> lastFullBuild) {
+        return !lastFullBuild.exists(s -> s == RunStatus.FAILED || s == RunStatus.CANCELLED);
     }
 
     private void runBuild(long runId, Long ingestRunId, long cancelKey) {
@@ -419,7 +442,7 @@ public class EdgeBuildService {
                         .from(ec)
                         .leftJoin(lateral(g)).on(trueCondition())
                         .leftJoin(lateral(k)).on(trueCondition())
-                        .leftJoin(lateral(d)).on(trueCondition())
+                        .join(lateral(d)).on(trueCondition())
                         .where(ec.MOVIE_A.between(val(chunkStart), val(chunkEnd)))
                         .and(dirty))
                 .onConflict(EDGE.MOVIE_A, EDGE.MOVIE_B)

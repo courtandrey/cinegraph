@@ -58,8 +58,9 @@ public class IncrementalLoadService {
 
     @Scheduled(cron = "0 30 9 * * *", zone = "UTC")
     public void scheduledRun() {
-        if (runRepo.hasRunning(RunKind.FULL, RunKind.INCREMENTAL)) {
-            log.info("Skipping scheduled incremental: another load is already running");
+        if (runRepo.hasRunning(RunKind.FULL, RunKind.INCREMENTAL)
+                || runRepo.hasRunning(RunKind.edgeBuilds())) {
+            log.info("Skipping scheduled incremental: another load or an edge build is running");
             return;
         }
         io.vavr.control.Try.run(this::triggerIncremental)
@@ -72,6 +73,9 @@ public class IncrementalLoadService {
         }
         if (runRepo.hasRunning(RunKind.INCREMENTAL)) {
             throw new IllegalStateException("An INCREMENTAL load is already running");
+        }
+        if (runRepo.hasRunning(RunKind.edgeBuilds())) {
+            throw new IllegalStateException("An edge build is running; wait for it to finish");
         }
         long runId = runRepo.create(RunKind.INCREMENTAL);
         runRegistry.launch(runId, () -> runIncremental(runId));

@@ -62,14 +62,20 @@ public class FullLoadService {
         if (runRepo.hasRunning(RunKind.FULL)) {
             throw new IllegalStateException("A FULL load is already running");
         }
+        if (runRepo.hasRunning(RunKind.edgeBuilds())) {
+            throw new IllegalStateException("An edge build is running; wait for it to finish");
+        }
         long runId = runRepo.create(RunKind.FULL);
         runRegistry.launch(runId, () -> runFullLoad(runId));
         return runId;
     }
 
     public long triggerRetryStuck() {
-        if (runRepo.hasRunning(RunKind.FULL, RunKind.INCREMENTAL, RunKind.RETRY, RunKind.REPROJECT)) {
+        if (runRepo.hasRunning(RunKind.ingests())) {
             throw new IllegalStateException("Another load is already running");
+        }
+        if (runRepo.hasRunning(RunKind.edgeBuilds())) {
+            throw new IllegalStateException("An edge build is running; wait for it to finish");
         }
         long runId = runRepo.create(RunKind.RETRY);
         runRegistry.launch(runId, () -> runRetryStuck(runId));

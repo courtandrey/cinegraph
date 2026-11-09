@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * T5 — scoring SQL correctness on a hand-crafted 8-movie fixture.
@@ -172,6 +173,59 @@ class EdgeBuildServiceTest {
                 "SELECT computed_at FROM edge WHERE movie_a=5 AND movie_b=6",
                 java.time.Instant.class);
         assertThat(after56).isEqualTo(before56);
+    }
+
+    // ── run guards ─────────────────────────────────────────────────────────────
+
+    @Test
+    void fullRebuild_rejectedWhileIngestRuns() {
+        jdbc.update("INSERT INTO load_run (kind, status) VALUES ('INCREMENTAL', 'RUNNING')");
+
+        assertThatThrownBy(() -> edgeBuildService.triggerFullRebuild())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ingest");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM load_run WHERE kind = 'EDGE_FULL'", Integer.class)).isZero();
+    }
+
+    @Test
+    void incrementalEdges_refusedAfterFailedFullBuild_edgesUntouched() throws Exception {
+        runFullRebuild();
+        jdbc.update("INSERT INTO load_run (kind, status) VALUES ('EDGE_FULL', 'FAILED')");
+        jdbc.update("INSERT INTO person (person_id, name) VALUES (100, 'New Director')");
+        jdbc.update("INSERT INTO credit (movie_id, person_id, role, department) VALUES (1, 100, 'DIRECTOR', 'Directing')");
+        jdbc.update("INSERT INTO credit (movie_id, person_id, role, department) VALUES (2, 100, 'DIRECTOR', 'Directing')");
+        long ingestRunId = jdbc.queryForObject(
+                "INSERT INTO load_run (kind, status) VALUES ('INCREMENTAL', 'COMPLETED') RETURNING id",
+                Long.class);
+        jdbc.update("INSERT INTO dirty_movie (run_id, movie_id) VALUES (?, 1), (?, 2)", ingestRunId, ingestRunId);
+        float before12 = jdbc.queryForObject(
+                "SELECT total_score FROM edge WHERE movie_a=1 AND movie_b=2", Float.class);
+
+        assertThatThrownBy(() -> edgeBuildService.triggerIncrementalEdges(ingestRunId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("partial");
+        edgeBuildService.runIncrementalEdgesSync(ingestRunId);
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM load_run WHERE kind = 'EDGE_INCREMENTAL'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT total_score FROM edge WHERE movie_a=1 AND movie_b=2", Float.class)).isEqualTo(before12);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM dirty_movie WHERE run_id = ?", Integer.class, ingestRunId)).isEqualTo(2);
+    }
+
+    @Test
+    void incrementalEdges_allowedAgainAfterSuccessfulFullBuild() throws Exception {
+        jdbc.update("INSERT INTO load_run (kind, status) VALUES ('EDGE_FULL', 'FAILED')");
+        runFullRebuild();
+        long ingestRunId = jdbc.queryForObject(
+                "INSERT INTO load_run (kind, status) VALUES ('INCREMENTAL', 'COMPLETED') RETURNING id",
+                Long.class);
+        jdbc.update("INSERT INTO dirty_movie (run_id, movie_id) VALUES (?, 1)", ingestRunId);
+
+        long edgeRunId = edgeBuildService.triggerIncrementalEdges(ingestRunId);
+        awaitRunCompletion(edgeRunId, 30, TimeUnit.SECONDS);
     }
 
     // ── fixture ────────────────────────────────────────────────────────────────

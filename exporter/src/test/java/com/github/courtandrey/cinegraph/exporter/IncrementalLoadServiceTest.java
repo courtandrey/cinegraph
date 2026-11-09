@@ -175,6 +175,29 @@ class IncrementalLoadServiceTest {
         }).isInstanceOf(AssertionError.class).hasMessageContaining("FAILED");
     }
 
+    // ── ingest / edge build mutual exclusion ──────────────────────────────────────────────────
+
+    @Test
+    void incremental_rejectedWhileEdgeBuildRuns() {
+        jdbc.update("INSERT INTO load_run (kind, status) VALUES ('EDGE_FULL', 'RUNNING')");
+
+        assertThatThrownBy(() -> incrementalLoadService.triggerIncremental())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("edge build");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM load_run WHERE kind = 'INCREMENTAL'", Integer.class)).isZero();
+    }
+
+    @Test
+    void scheduledIncremental_skipsWhileEdgeBuildRuns() {
+        jdbc.update("INSERT INTO load_run (kind, status) VALUES ('EDGE_INCREMENTAL', 'RUNNING')");
+
+        incrementalLoadService.scheduledRun();
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM load_run WHERE kind = 'INCREMENTAL'", Integer.class)).isZero();
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────────────────
 
     private void awaitCompletion(long runId, long timeout, TimeUnit unit) throws InterruptedException {

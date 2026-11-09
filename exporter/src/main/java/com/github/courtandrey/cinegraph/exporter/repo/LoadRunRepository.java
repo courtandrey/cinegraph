@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.courtandrey.cinegraph.exporter.domain.RunKind;
 import com.github.courtandrey.cinegraph.exporter.domain.RunStatus;
+import io.vavr.control.Option;
 import io.vavr.control.Try;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
@@ -63,6 +64,16 @@ public class LoadRunRepository {
         return ctx.fetchExists(LOAD_RUN,
                 LOAD_RUN.KIND.in(Arrays.stream(kinds).map(Enum::name).toList())
                         .and(LOAD_RUN.STATUS.eq(RunStatus.RUNNING.name())));
+    }
+
+    public Option<RunStatus> latestStatus(RunKind kind) {
+        return Option.ofOptional(ctx.select(LOAD_RUN.STATUS)
+                        .from(LOAD_RUN)
+                        .where(LOAD_RUN.KIND.eq(kind.name()))
+                        .orderBy(LOAD_RUN.ID.desc())
+                        .limit(1)
+                        .fetchOptional(LOAD_RUN.STATUS))
+                .map(RunStatus::valueOf);
     }
 
     public void updateStats(long id, String statsJson) {
