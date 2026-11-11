@@ -77,10 +77,11 @@ public class LetterboxdController {
     @GetMapping("/{hash}/recommendations")
     public ResponseEntity<?> recommendations(@PathVariable String hash,
                                              @RequestParam(required = false) Long graphId,
+                                             @RequestParam(required = false) Long clusterId,
                                              @RequestParam(defaultValue = "false") boolean invert,
                                              @RequestParam(defaultValue = "0") int minRuntime,
                                              @RequestParam(defaultValue = "25") int limit) {
-        return ResponseEntity.ok(service.recommendations(hash, graphId, invert, Math.max(minRuntime, 0), limit));
+        return ResponseEntity.ok(service.recommendations(hash, graphId, clusterId, invert, Math.max(minRuntime, 0), limit));
     }
 
     @GetMapping("/{hash}/recommendations/{movieId}/breakdown")

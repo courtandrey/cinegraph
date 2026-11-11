@@ -17,7 +17,9 @@ public class LetterboxdSetRepository {
 
     public record MovieRating(long movieId, Double rating) {}
 
-    public record SetFilm(long movieId, Float rating, Long graphId) {}
+    public record SetFilm(long movieId, Float rating, Long graphId, Long clusterId) {}
+
+    public record SetPlacement(long graphId, long clusterId) {}
 
     private final DSLContext ctx;
 
@@ -35,10 +37,11 @@ public class LetterboxdSetRepository {
     }
 
     public List<SetFilm> loadSetFilms(String hash) {
-        return ctx.select(LETTERBOXD_SET.MOVIE_ID, LETTERBOXD_SET.RATING, LETTERBOXD_SET.GRAPH_ID)
+        return ctx.select(LETTERBOXD_SET.MOVIE_ID, LETTERBOXD_SET.RATING, LETTERBOXD_SET.GRAPH_ID,
+                        LETTERBOXD_SET.CLUSTER_ID)
                 .from(LETTERBOXD_SET)
                 .where(LETTERBOXD_SET.HASH.eq(hash))
-                .fetch(r -> new SetFilm(r.value1(), r.value2(), r.value3()));
+                .fetch(r -> new SetFilm(r.value1(), r.value2(), r.value3(), r.value4()));
     }
 
     public Set<Long> filterInSet(String hash, Collection<Long> movieIds) {
@@ -69,13 +72,14 @@ public class LetterboxdSetRepository {
         batch.execute();
     }
 
-    public void updateGraphIds(String hash, Map<Long, Long> graphIdByMovie) {
-        if (graphIdByMovie.isEmpty()) return;
+    public void updatePlacements(String hash, Map<Long, SetPlacement> placementByMovie) {
+        if (placementByMovie.isEmpty()) return;
         var update = ctx.update(LETTERBOXD_SET)
                 .set(LETTERBOXD_SET.GRAPH_ID, (Long) null)
+                .set(LETTERBOXD_SET.CLUSTER_ID, (Long) null)
                 .where(LETTERBOXD_SET.HASH.eq("").and(LETTERBOXD_SET.MOVIE_ID.eq(0L)));
         var batch = ctx.batch(update);
-        graphIdByMovie.forEach((movieId, graphId) -> batch.bind(graphId, hash, movieId));
+        placementByMovie.forEach((movieId, p) -> batch.bind(p.graphId(), p.clusterId(), hash, movieId));
         batch.execute();
     }
 }

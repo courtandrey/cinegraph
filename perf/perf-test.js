@@ -246,7 +246,7 @@ export function uploadTest(data) {
   check(r, {
     'upload: status 200': res => res.status === 200,
     'upload: hash matches': res => res.json('hash') === data.hashes[idx],
-    'upload: graphs built': res => (res.json('graphs') || []).length > 0,
+    'upload: map built': res => (res.json('map.nodes') || []).length > 0,
   });
 }
 

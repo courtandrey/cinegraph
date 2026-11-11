@@ -1,7 +1,7 @@
 <div class="lbxd-page" [class.path-active]="path() !== null" [class.path-sheet-open]="pathSheetOpen()">
   <div class="toolbar">
     <button class="back-btn" (click)="router.navigate(['/'])">Search</button>
-    <span class="title-hint">Click a film to inspect it</span>
+    <span class="title-hint">Tap a cluster to see who connects it, or a film to inspect it</span>
     <span class="control-group">
       <span class="control-label">MIN IN-SCORE</span>
       <input
@@ -16,16 +16,22 @@
 
   <div class="body">
     <div class="canvas-area">
-      @if (payload(); as p) {
-        <app-graph-canvas
-          [graph]="p"
-          [centerId]="centerId()"
-          [layoutByInScore]="true"
+      @if (viewMap(); as vm) {
+        <app-cluster-map
+          [map]="vm"
+          [colors]="colors()"
+          [labels]="labels()"
           [selectedNodeId]="selectedNodeId()"
+          [adjacency]="store.adjacency()"
+          [selectedClusterId]="selectedClusterId()"
+          [selectedLink]="selectedLink()"
           [focus]="focusTarget()"
+          [focusCluster]="focusCluster()"
           [pathNodeIds]="pathNodeIds()"
           [pathRightInset]="pathRightInset()"
           (nodeTap)="onNodeTap($event)"
+          (clusterTap)="onClusterTap($event)"
+          (linkTap)="onLinkTap($event)"
           (clearSelection)="onClearSelection()"
         />
       } @else if (status() === 'error') {
@@ -34,7 +40,17 @@
         <div class="empty-state">The graph is loading…</div>
       }
 
-      @if (store.count() > 0) {
+      @if (linkSummary(); as link) {
+        <button class="link-chip" (click)="onClearSelection()" aria-label="Hide these connections">
+          <span class="link-dot" [style.background]="link.colorA"></span>{{ link.labelA }}
+          <span class="link-arrow">↔</span>
+          <span class="link-dot" [style.background]="link.colorB"></span>{{ link.labelB }}
+          <span class="link-count">{{ link.edges }} connections</span>
+          <span class="link-close">✕</span>
+        </button>
+      }
+
+      @if (store.loaded()) {
         <div class="bottom-controls">
           <button class="find-btn" (click)="openSearch()" aria-label="Find a film">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -43,13 +59,12 @@
               <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
             </svg>
           </button>
-          @if (store.count() > 1) {
-            <div class="graph-switcher">
-              <button class="arrow" (click)="prev()" [disabled]="store.index() === 0" aria-label="Previous graph">←</button>
-              <span class="counter">{{ store.index() + 1 }}/{{ store.count() }}</span>
-              <button class="arrow" (click)="next()" [disabled]="store.index() === store.count() - 1" aria-label="Next graph">→</button>
-            </div>
-          }
+          <button class="find-btn fit-btn" (click)="fitMap()" aria-label="Show all clusters">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path>
+            </svg>
+          </button>
           <button class="find-btn recs-btn" (click)="openRecs()" aria-label="Recommendations">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -84,12 +99,12 @@
               </svg>
             </button>
           </div>
-          @if (store.count() > 1) {
+          @if (recsClusterId() !== null) {
             <div class="recs-scope" role="group" aria-label="Recommendation scope">
               <button class="scope-btn" [class.active]="recsScope() === 'all'"
                       (click)="setRecsScope('all')">All films</button>
-              <button class="scope-btn" [class.active]="recsScope() === 'component'"
-                      (click)="setRecsScope('component')">This graph</button>
+              <button class="scope-btn scope-cluster" [class.active]="recsScope() === 'cluster'"
+                      (click)="setRecsScope('cluster')">{{ recsScopeLabel() }}</button>
             </div>
           }
           <label class="runtime-filter">
@@ -169,6 +184,27 @@
           <button class="dismiss-btn" (click)="dismissPathToSource()">{{ pathReturn() ? 'Back' : 'DISMISS PATH' }}</button>
         </div>
       </aside>
+    } @else if (selectedCluster()) {
+      @let c = selectedCluster()!;
+      <aside class="side-panel cluster-panel" [style.--cluster]="colors().get(c.id)">
+        <button class="panel-collapse" (click)="onClearSelection()">▾ Collapse</button>
+        <div class="detail-scroll">
+          <app-cluster-panel
+            [cluster]="c"
+            [label]="labels().get(c.id) ?? ''"
+            [labels]="labels()"
+            [colors]="colors()"
+            [hub]="selectedClusterHub()"
+            [bridges]="selectedClusterBridges()"
+            [neighbours]="neighbours()"
+            (filmTap)="onNodeTap($event); focusNode($event)"
+            (clusterTap)="openCluster($event)"
+          />
+        </div>
+        <div class="panel-footer">
+          <button class="check-compat-btn" (click)="openClusterRecs()">Recommendations from this cluster</button>
+        </div>
+      </aside>
     } @else if (selectedNodeId() !== null) {
       <aside class="side-panel">
       @if (detailReturn() === 'recs') {
@@ -187,6 +223,13 @@
 
           <h2 class="detail-title">{{ m.title }}</h2>
           @if (m.year) { <div class="detail-year">{{ m.year }}</div> }
+
+          @if (selectedFilm(); as f) {
+            @if (f.shares.length) {
+              <app-film-shares [film]="f" [labels]="labels()" [colors]="colors()"
+                               [clusters]="store.clusterById()" (clusterTap)="openCluster($event)" />
+            }
+          }
 
           @if (selectedNotConnected()) {
             <div class="not-connected-row">Not connected to your set.</div>

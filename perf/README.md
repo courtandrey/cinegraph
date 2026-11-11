@@ -29,7 +29,7 @@ Outputs land in `perf/results/` (git-ignored):
    - `film_detail` — `GET /movies/{id}`
    - `film_graph` — `GET /movies/{id}/graph?minScore=0&limit=40`
    - `shortest_path` — `GET /movies/{from}/path/{to}` (random pairs; `found:false` is a valid answer, only HTTP failures count)
-   - `upload` — `POST /letterboxd/graphs` with the synthetic CSVs (`LB_PARALLEL` parallel); checks the server-returned hash matches the precomputed one and that graphs were built
+   - `upload` — `POST /letterboxd/graphs` with the synthetic CSVs (`LB_PARALLEL` parallel); checks the server-returned hash matches the precomputed one and that the cluster map was built
    - `recommendations` — `GET /letterboxd/{hash}/recommendations?limit=25` against the uploaded sets (`LB_PARALLEL` parallel), scheduled after the upload slot (`upload start + SLO_UPLOAD_MS + 10s`)
 
 Every response is checked for 2xx status and a sane body; any 4xx/5xx fails the run.

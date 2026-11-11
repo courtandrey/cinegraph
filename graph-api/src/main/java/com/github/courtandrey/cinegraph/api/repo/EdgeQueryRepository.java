@@ -32,6 +32,8 @@ public class EdgeQueryRepository {
     public record RawEdge(long movieA, long movieB,
                           float totalScore, float crewScore, JsonNode components) {}
 
+    public record PairEdge(long movieA, long movieB, float totalScore, float crewScore, String componentsJson) {}
+
     public record Recommendation(long movieId, double score) {}
 
     public record SetEdge(long setMovieId, double inScore, Double rating) {}
@@ -147,25 +149,26 @@ public class EdgeQueryRepository {
                         text(r.get("components", JSONB.class))));
     }
 
-    public List<NeighborEdge> findEdgesAmong(List<Long> ids) {
+    public List<PairEdge> findEdgesAmong(List<Long> ids) {
         if (ids.size() < 2) return List.of();
-        return ctx.select(EDGE.MOVIE_A, EDGE.MOVIE_B, EDGE.TOTAL_SCORE, EDGE.COMPONENTS)
+        return ctx.select(EDGE.MOVIE_A, EDGE.MOVIE_B, EDGE.TOTAL_SCORE, EDGE.CREW_SCORE, EDGE.COMPONENTS)
                 .from(EDGE)
                 .where(EDGE.MOVIE_A.in(ids).and(EDGE.MOVIE_B.in(ids)))
-                .orderBy(EDGE.TOTAL_SCORE.desc())
-                .fetch(r -> new NeighborEdge(
-                        r.get(EDGE.MOVIE_A),
+                .orderBy(EDGE.TOTAL_SCORE.desc(), EDGE.MOVIE_A, EDGE.MOVIE_B)
+                .fetch(r -> new PairEdge(
                         r.get(EDGE.MOVIE_A),
                         r.get(EDGE.MOVIE_B),
                         r.get(EDGE.TOTAL_SCORE),
+                        r.get(EDGE.CREW_SCORE),
                         text(r.get(EDGE.COMPONENTS))));
     }
 
-    public List<Recommendation> topRecommendations(String hash, Long graphId, boolean invert,
+    public List<Recommendation> topRecommendations(String hash, Long graphId, Long clusterId, boolean invert,
                                                    int minRuntime, int limit) {
         var rated = LETTERBOXD_SET.as("rated");
         var owned = LETTERBOXD_SET.as("owned");
-        Condition scope = graphId == null ? noCondition() : rated.GRAPH_ID.eq(graphId);
+        Condition scope = (graphId == null ? noCondition() : rated.GRAPH_ID.eq(graphId))
+                .and(clusterId == null ? noCondition() : rated.CLUSTER_ID.eq(clusterId));
         Field<Double> contribution = EDGE.TOTAL_SCORE.cast(Double.class)
                 .mul(ratingCoef(rated.RATING)).as("contribution");
 

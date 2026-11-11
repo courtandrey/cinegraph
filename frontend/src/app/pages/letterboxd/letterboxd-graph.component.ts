@@ -1,6 +1,9 @@
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { GraphCanvasComponent } from '../graph/graph-canvas/graph-canvas.component';
+import { ClusterMapComponent, ClusterPair } from './cluster-map/cluster-map.component';
+import { FilmSharesComponent } from './film-shares/film-shares.component';
+import { clusterColors } from './cluster-map/cluster-colors';
+import { ClusterPanelComponent, NeighbourCluster } from './cluster-panel/cluster-panel.component';
 import { LetterboxdSearchComponent } from './letterboxd-search/letterboxd-search.component';
 import { CompatSearchComponent } from './compat-search/compat-search.component';
 import { LetterboxdPathModalComponent } from './letterboxd-path-modal/letterboxd-path-modal.component';
@@ -8,7 +11,7 @@ import { LetterboxdStore } from '../../services/letterboxd-store.service';
 import { GraphStore } from '../../services/graph-store.service';
 import { MovieApiService } from '../../services/movie-api.service';
 import { SeoService } from '../../services/seo.service';
-import { GraphPayload, GraphNode, GraphEdge, MovieDetail } from '../../models/movie.model';
+import { GraphNode, GraphEdge, LetterboxdMap, MovieDetail } from '../../models/movie.model';
 
 interface PathView {
   nodes: GraphNode[];
@@ -24,11 +27,13 @@ const MIN_RUNTIME_STEPS = [0, 5, 10, 20, 30, 40, 50, 60];
 @Component({
   selector: 'app-letterboxd-graph',
   standalone: true,
-  imports: [GraphCanvasComponent, LetterboxdSearchComponent, CompatSearchComponent, LetterboxdPathModalComponent],
+  imports: [ClusterMapComponent, ClusterPanelComponent, FilmSharesComponent, LetterboxdSearchComponent, CompatSearchComponent, LetterboxdPathModalComponent],
   templateUrl: './letterboxd-graph.component.html',
   styleUrl: './letterboxd-graph.component.scss'
 })
 export class LetterboxdGraphComponent implements OnInit, OnDestroy {
+  @ViewChild(ClusterMapComponent) private clusterMap?: ClusterMapComponent;
+
   readonly store = inject(LetterboxdStore);
   private graphStore = inject(GraphStore);
   readonly router = inject(Router);
@@ -47,6 +52,9 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly compatNotConnected = signal(false);
   readonly forcedNodeIds = signal<Set<number>>(new Set());
   readonly focusTarget = signal<{ id: number } | null>(null);
+  readonly selectedClusterId = signal<number | null>(null);
+  readonly focusCluster = signal<{ id: number } | null>(null);
+  readonly selectedLink = signal<ClusterPair | null>(null);
 
   readonly pathSearchOpen = signal(false);
   readonly path = signal<PathView | null>(null);
@@ -56,7 +64,8 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly recsOpen = signal(false);
   readonly recs = signal<GraphNode[] | null>(null);
   readonly recsStatus = signal<'idle' | 'loading' | 'error'>('idle');
-  readonly recsScope = signal<'all' | 'component'>('all');
+  readonly recsScope = signal<'all' | 'cluster'>('all');
+  readonly recsClusterId = signal<number | null>(null);
   readonly recsInvert = signal(false);
   readonly minRuntimeSteps = MIN_RUNTIME_STEPS;
   readonly recsMinRuntime = signal(0);
@@ -64,11 +73,11 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   private recsKey: string | null = null;
   private recsSeq = 0;
 
-  readonly currentRecsKey = computed(() => {
-    const scope = this.recsScope();
-    const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
-    return `${scope}:${graphId ?? ''}:${this.recsInvert()}:${this.recsMinRuntime()}`;
-  });
+  readonly currentRecsKey = computed(() =>
+    recsKeyOf(this.recsScopeCluster(), this.recsInvert(), this.recsMinRuntime()));
+
+  readonly recsScopeCluster = computed(() =>
+    this.recsScope() === 'cluster' ? this.recsClusterId() : null);
 
   private recsScrollEl: HTMLElement | null = null;
 
@@ -84,9 +93,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   readonly inScoreById = computed(() => {
     const map = new Map<number, number>();
-    const g = this.store.current();
-    if (!g) return map;
-    for (const n of g.nodes) map.set(n.id, n.inScore);
+    for (const n of this.store.map()?.nodes ?? []) map.set(n.id, n.inScore);
     return map;
   });
 
@@ -96,24 +103,78 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     return Math.ceil(max);
   });
 
-  readonly payload = computed<GraphPayload | null>(() => {
-    const g = this.store.current();
-    if (!g) return null;
+  readonly viewMap = computed<LetterboxdMap | null>(() => {
+    const map = this.store.map();
+    if (!map || !map.nodes.length) return null;
     const scores = this.inScoreById();
     const threshold = this.store.inScoreThreshold();
     const forced = this.forcedNodeIds();
-
     const keep = new Set<number>(
-      g.nodes.filter(n => (scores.get(n.id) ?? 0) >= threshold || forced.has(n.id)).map(n => n.id)
+      map.nodes.filter(n => (scores.get(n.id) ?? 0) >= threshold || forced.has(n.id)).map(n => n.id)
     );
-    const nodes = g.nodes.filter(n => keep.has(n.id));
-    if (!nodes.length) return null;
-    const edges = g.edges.filter(e => keep.has(e.source) && keep.has(e.target));
-    const center = nodes.find(n => n.id === g.centerId) ?? nodes[0];
-    return { center: toDetailLike(center), nodes, edges };
+    return {
+      ...map,
+      nodes: map.nodes.filter(n => keep.has(n.id)),
+      films: map.films.filter(f => keep.has(f.movieId))
+    };
   });
 
-  readonly centerId = computed(() => this.payload()?.center.id ?? 0);
+  readonly colors = computed(() => clusterColors(this.store.map()?.clusters ?? []));
+
+  readonly labels = computed(() => {
+    const titles = new Map((this.store.map()?.nodes ?? []).map(n => [n.id, n.title]));
+    const out = new Map<number, string>();
+    for (const c of this.store.map()?.clusters ?? []) {
+      out.set(c.id, c.kind === 'CLUSTER' ? c.contributors[0]?.name ?? titles.get(c.hubId) ?? '' : 'Small group');
+    }
+    return out;
+  });
+
+  readonly selectedFilm = computed(() => {
+    const id = this.selectedNodeId();
+    return id == null ? null : this.store.filmById().get(id) ?? null;
+  });
+
+  readonly linkSummary = computed(() => {
+    const pair = this.selectedLink();
+    const link = pair && this.store.map()?.links.find(l => l.source === pair.a && l.target === pair.b);
+    if (!pair || !link) return null;
+    const label = (id: number) => this.labels().get(id) || 'Small group';
+    return {
+      labelA: label(pair.a), colorA: this.colors().get(pair.a),
+      labelB: label(pair.b), colorB: this.colors().get(pair.b),
+      edges: link.edges
+    };
+  });
+
+  readonly selectedCluster = computed(() => {
+    const id = this.selectedClusterId();
+    return id == null ? null : this.store.clusterById().get(id) ?? null;
+  });
+
+  readonly selectedClusterBridges = computed(() => {
+    const id = this.selectedClusterId();
+    return (this.store.map()?.films ?? []).filter(f => f.clusterId === id && f.placement === 'BRIDGE').length;
+  });
+
+  readonly selectedClusterHub = computed(() => {
+    const c = this.selectedCluster();
+    return c ? this.store.map()?.nodes.find(n => n.id === c.hubId) ?? null : null;
+  });
+
+  readonly neighbours = computed<NeighbourCluster[]>(() => {
+    const id = this.selectedClusterId();
+    const map = this.store.map();
+    if (id == null || !map) return [];
+    const byId = this.store.clusterById();
+    return map.links
+      .filter(l => l.source === id || l.target === id)
+      .map(l => ({ other: l.source === id ? l.target : l.source, affinity: l.affinity }))
+      .filter(l => byId.get(l.other)?.kind === 'CLUSTER')
+      .sort((a, b) => b.affinity - a.affinity)
+      .slice(0, 4)
+      .map(l => ({ id: l.other, label: this.labels().get(l.other) ?? '', color: this.colors().get(l.other) ?? '' }));
+  });
 
   readonly recScoreById = computed(() => {
     const map = new Map<number, number>();
@@ -149,16 +210,20 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   readonly selectedScoreLabel = computed(() =>
     this.isRecommendation() ? 'Recommendation score' : 'Total in-score');
 
+  readonly recsScopeLabel = computed(() => {
+    const id = this.recsClusterId();
+    return id == null ? '' : this.labels().get(id) ?? '';
+  });
+
   private detailSeq = 0;
 
   constructor() {
     effect(() => {
       if (!this.recsOpen()) return;
-      const scope = this.recsScope();
+      const clusterId = this.recsScopeCluster();
       const invert = this.recsInvert();
       const minRuntime = this.recsMinRuntime();
-      const graphId = scope === 'component' ? this.store.current()?.centerId ?? 0 : null;
-      untracked(() => this.ensureRecs(scope, graphId, invert, minRuntime));
+      untracked(() => this.ensureRecs(clusterId, invert, minRuntime));
     });
 
     effect(() => {
@@ -180,9 +245,8 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     if (el instanceof HTMLElement) this.store.rememberRecsScroll(this.currentRecsKey(), el.scrollTop);
   }
 
-  private ensureRecs(scope: 'all' | 'component', graphId: number | null, invert: boolean,
-                     minRuntime: number): void {
-    const key = `${scope}:${graphId ?? ''}:${invert}:${minRuntime}`;
+  private ensureRecs(clusterId: number | null, invert: boolean, minRuntime: number): void {
+    const key = recsKeyOf(clusterId, invert, minRuntime);
     if (this.recsKey === key && (this.recs() !== null || this.recsStatus() === 'loading')) return;
     const hash = this.store.hash();
     if (!hash) return;
@@ -190,7 +254,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.recs.set(null);
     this.recsStatus.set('loading');
     const seq = ++this.recsSeq;
-    this.api.letterboxdRecommendations(hash, 25, graphId ?? undefined, invert, minRuntime).subscribe({
+    this.api.letterboxdRecommendations(hash, 25, clusterId ?? undefined, invert, minRuntime).subscribe({
       next: list => { if (seq === this.recsSeq) { this.recs.set(list); this.recsStatus.set('idle'); } },
       error: () => { if (seq === this.recsSeq) this.recsStatus.set('error'); }
     });
@@ -204,13 +268,13 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     });
     const hash = this.route.snapshot.paramMap.get('hash');
     if (!hash) { this.router.navigate(['/']); return; }
-    if (this.store.hash() === hash && this.store.count() > 0) return;
+    if (this.store.hash() === hash && this.store.loaded()) return;
 
     this.status.set('loading');
     this.api.letterboxdOverview(hash).subscribe({
-      next: graphs => {
-        if (!graphs.length) { this.status.set('error'); return; }
-        this.store.set(hash, graphs);
+      next: map => {
+        if (!map.nodes.length) { this.status.set('error'); return; }
+        this.store.set(hash, map);
         this.status.set('ready');
       },
       error: () => this.status.set('error')
@@ -224,6 +288,8 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   onNodeTap(id: number): void {
     if (this.path()) this.dismissPath();
     this.recsOpen.set(false);
+    this.selectedClusterId.set(null);
+    this.selectedLink.set(null);
     this.detailReturn.set(null);
     this.compatId.set(null);
     this.compatScoreValue.set(null);
@@ -240,6 +306,41 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   onClearSelection(): void {
     this.selectedNodeId.set(null);
     this.selectedDetail.set(null);
+    this.selectedClusterId.set(null);
+    this.selectedLink.set(null);
+  }
+
+  onLinkTap(pair: ClusterPair): void {
+    if (this.path()) this.dismissPath();
+    this.recsOpen.set(false);
+    this.onClearSelection();
+    this.selectedLink.set(pair);
+  }
+
+  onClusterTap(id: number): void {
+    if (this.path()) this.dismissPath();
+    this.recsOpen.set(false);
+    this.selectedNodeId.set(null);
+    this.selectedDetail.set(null);
+    this.selectedLink.set(null);
+    this.selectedClusterId.set(id);
+  }
+
+  openCluster(id: number): void {
+    this.onClusterTap(id);
+    this.focusCluster.set({ id });
+  }
+
+  openClusterRecs(): void {
+    const id = this.selectedClusterId();
+    if (id == null) return;
+    this.recsClusterId.set(id);
+    this.recsScope.set('cluster');
+    this.openRecs();
+  }
+
+  fitMap(): void {
+    this.clusterMap?.fitAll();
   }
 
   deepDive(): void {
@@ -258,14 +359,6 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.thresholdTimer = setTimeout(() => this.store.setInScoreThreshold(v), 500);
   }
 
-  private resetThreshold(): void {
-    if (this.thresholdTimer) clearTimeout(this.thresholdTimer);
-    this.thresholdDisplay.set(0);
-    this.store.setInScoreThreshold(0);
-    this.forcedNodeIds.set(new Set());
-    this.dismissPath();
-  }
-
   openSearch(): void {
     this.searchOpen.set(true);
   }
@@ -276,7 +369,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.recsOpen.set(true);
   }
 
-  setRecsScope(scope: 'all' | 'component'): void {
+  setRecsScope(scope: 'all' | 'cluster'): void {
     this.recsScope.set(scope);
   }
 
@@ -331,36 +424,27 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
 
   onSearchPick(sel: { movieId: number; graphId: number }): void {
     this.searchOpen.set(false);
-    const idx = this.store.graphIndexByCenter(sel.graphId);
-    if (idx !== -1 && idx !== this.store.index()) {
-      this.resetThreshold();
-      this.store.setIndex(idx);
-    }
-
-    const g = this.store.current();
-    if (!g) return;
-
-    const inGraph = g.nodes.some(n => n.id === sel.movieId);
-    const hasVisibleEdge = g.edges.some(e => e.source === sel.movieId || e.target === sel.movieId);
-    if (inGraph && hasVisibleEdge) {
+    const map = this.store.map();
+    const hash = this.store.hash();
+    if (!map || !hash) return;
+    if (this.store.filmById().has(sel.movieId)) {
       this.revealAndFocus(sel.movieId);
       return;
     }
-
-    const hash = this.store.hash();
-    if (!hash) return;
-    this.api.letterboxdAttach(hash, sel.movieId, g.nodes.map(n => n.id)).subscribe({
+    const anchor = this.componentAnchor(sel.graphId);
+    this.api.letterboxdAttach(hash, sel.movieId, map.nodes.map(n => n.id)).subscribe({
       next: att => {
-        if (att.edges.length > 0) {
-          this.store.mergeIntoCurrent(att.node, att.edges);
-          this.revealAndFocus(sel.movieId);
-        } else {
-          this.store.mergeIntoCurrent(att.node, []);
-          this.connectViaPath(sel.movieId, g.centerId);
-        }
+        this.store.merge([att.node], att.edges);
+        if (att.edges.length > 0 || anchor == null) this.revealAndFocus(sel.movieId);
+        else this.connectViaPath(sel.movieId, anchor);
       },
-      error: () => this.connectViaPath(sel.movieId, g.centerId)
+      error: () => anchor == null ? this.revealAndFocus(sel.movieId) : this.connectViaPath(sel.movieId, anchor)
     });
+  }
+
+  private componentAnchor(componentId: number): number | null {
+    const clusters = (this.store.map()?.clusters ?? []).filter(c => c.componentId === componentId);
+    return clusters.sort((a, b) => b.size - a.size)[0]?.hubId ?? null;
   }
 
   private connectViaPath(movieId: number, targetId: number): void {
@@ -369,7 +453,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.api.letterboxdPath(hash, movieId, targetId).subscribe({
       next: res => {
         if (res.found && res.nodes.length) {
-          this.store.mergeManyIntoCurrent(res.nodes, res.edges);
+          this.store.merge(res.nodes, res.edges);
           this.forceReveal(res.nodes.map(n => n.id));
         }
         this.revealAndFocus(movieId);
@@ -406,7 +490,7 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     this.api.letterboxdPath(hash, sourceId, targetId).subscribe({
       next: res => {
         if (!res.found || res.nodes.length < 2) return;
-        this.store.mergeManyIntoCurrent(res.nodes, res.edges);
+        this.store.merge(res.nodes, res.edges);
         this.forceReveal(res.nodes.map(n => n.id));
         this.onClearSelection();
         this.pathReturn.set(from);
@@ -431,18 +515,6 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     }
   }
 
-  prev(): void {
-    this.onClearSelection();
-    this.resetThreshold();
-    this.store.prev();
-  }
-
-  next(): void {
-    this.onClearSelection();
-    this.resetThreshold();
-    this.store.next();
-  }
-
   focusNode(id: number): void {
     this.focusTarget.set({ id });
   }
@@ -451,12 +523,11 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
     return window.innerWidth > 820 ? 340 : 0;
   }
 
-  readonly pathGraphId = computed(() => this.store.current()?.centerId ?? 0);
+  readonly pathGraphId = computed(() => this.selectedFilm()?.componentId ?? 0);
 
   readonly pathSourceTitle = computed(() => {
-    const g = this.store.current();
     const src = this.selectedNodeId();
-    return g?.nodes.find(n => n.id === src)?.title ?? '';
+    return this.store.map()?.nodes.find(n => n.id === src)?.title ?? '';
   });
 
   posterW342(path: string | null): string | null {
@@ -468,18 +539,6 @@ export class LetterboxdGraphComponent implements OnInit, OnDestroy {
   }
 }
 
-function toDetailLike(node: GraphNode): MovieDetail {
-  return {
-    id: node.id,
-    title: node.title,
-    year: node.year,
-    posterPath: node.posterPath,
-    originalTitle: node.title,
-    releaseDate: null,
-    overview: '',
-    runtime: null,
-    genres: [],
-    countries: [],
-    voteAverage: 0
-  };
+function recsKeyOf(clusterId: number | null, invert: boolean, minRuntime: number): string {
+  return `${clusterId ?? 'all'}:${invert}:${minRuntime}`;
 }

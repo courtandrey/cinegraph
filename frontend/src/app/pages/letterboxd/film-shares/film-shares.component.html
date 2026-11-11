@@ -1,0 +1,44 @@
+<div class="head">
+  <span class="title">CONNECTIONS BY CLUSTER</span>
+  <span class="total">{{ totalLinks() }} links</span>
+</div>
+
+<div class="bar" (mouseleave)="hovered.set(null)">
+  @for (r of rows(); track r.clusterId) {
+    <button type="button" class="block"
+            [class.home]="r.home"
+            [class.active]="hovered() === r.clusterId"
+            [style.flex-grow]="r.share"
+            [style.background]="r.color"
+            [disabled]="!isOpenable(r.clusterId)"
+            [attr.aria-label]="r.label + ': ' + percent(r.share) + ', ' + r.links + ' links'"
+            (mouseenter)="hovered.set(r.clusterId)"
+            (focus)="hovered.set(r.clusterId)"
+            (blur)="hovered.set(null)"
+            (click)="clusterTap.emit(r.clusterId)"></button>
+  }
+</div>
+
+<ul class="legend" (mouseleave)="hovered.set(null)">
+  @for (r of legend(); track r.clusterId) {
+    <li>
+      <button type="button" class="row"
+              [class.active]="hovered() === r.clusterId"
+              [disabled]="!isOpenable(r.clusterId)"
+              (mouseenter)="hovered.set(r.clusterId)"
+              (click)="clusterTap.emit(r.clusterId)">
+        <span class="dot" [style.background]="r.color"></span>
+        <span class="name">{{ r.label }}@if (r.home) { <span class="home-tag">placed here</span> }</span>
+        <span class="links">{{ r.links }}</span>
+        <span class="share">{{ percent(r.share) }}</span>
+      </button>
+    </li>
+  }
+</ul>
+
+@if (hiddenCount() > 0) {
+  <button type="button" class="more" (click)="expanded.set(true)">+ {{ hiddenCount() }} more</button>
+}
+@if (bridge()) {
+  <div class="note">No cluster holds most of this film's connections, so it sits between them.</div>
+}

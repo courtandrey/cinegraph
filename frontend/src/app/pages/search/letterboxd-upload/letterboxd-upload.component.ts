@@ -29,11 +29,11 @@ export class LetterboxdUploadComponent {
     this.api.uploadLetterboxd(file).subscribe({
       next: res => {
         this.loading.set(false);
-        if (!res.graphs.length) {
+        if (!res.map.nodes.length) {
           this.error.set('No connected films found in that export.');
           return;
         }
-        this.store.set(res.hash, res.graphs);
+        this.store.set(res.hash, res.map);
         this.router.navigate(['/letterboxd', res.hash]);
       },
       error: () => {

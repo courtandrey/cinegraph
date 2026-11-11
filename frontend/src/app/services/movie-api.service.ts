@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MovieSummary, MovieDetail, GraphPayload, GraphNode, EdgeBreakdown, RoleWeight, LetterboxdGraph, LetterboxdUploadResponse, LetterboxdSearchResult, LetterboxdAttachment, PathResult, RecommendationBreakdown, CompatSearchResult } from '../models/movie.model';
+import { MovieSummary, MovieDetail, GraphPayload, GraphNode, EdgeBreakdown, RoleWeight, LetterboxdMap, LetterboxdUploadResponse, LetterboxdSearchResult, LetterboxdAttachment, PathResult, RecommendationBreakdown, CompatSearchResult } from '../models/movie.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -52,7 +52,7 @@ export class MovieApiService {
   }
 
   letterboxdOverview(hash: string) {
-    return this.http.get<LetterboxdGraph[]>(`${this.base}/letterboxd/${hash}/graphs`);
+    return this.http.get<LetterboxdMap>(`${this.base}/letterboxd/${hash}/graphs`);
   }
 
   letterboxdSearchGlobal(hash: string, q: string, limit = 10) {
@@ -67,9 +67,9 @@ export class MovieApiService {
     });
   }
 
-  letterboxdRecommendations(hash: string, limit = 25, graphId?: number, invert = false, minRuntime = 0) {
+  letterboxdRecommendations(hash: string, limit = 25, clusterId?: number, invert = false, minRuntime = 0) {
     const params: Record<string, string> = { limit: limit.toString() };
-    if (graphId != null) params['graphId'] = graphId.toString();
+    if (clusterId != null) params['clusterId'] = clusterId.toString();
     if (invert) params['invert'] = 'true';
     if (minRuntime > 0) params['minRuntime'] = minRuntime.toString();
     return this.http.get<GraphNode[]>(`${this.base}/letterboxd/${hash}/recommendations`, { params });

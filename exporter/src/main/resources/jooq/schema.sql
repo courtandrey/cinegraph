@@ -134,6 +134,7 @@ CREATE TABLE letterboxd_set (
     movie_id BIGINT NOT NULL,
     rating   REAL,
     graph_id BIGINT,
+    cluster_id BIGINT,
     PRIMARY KEY (hash, movie_id)
 );
 

@@ -51,32 +51,6 @@ public final class Graphs {
         return new Component(nodeIdsOf(edges), edges);
     }
 
-    public static Component capEdgesPerNode(Component c, int minPerNode, float minScoreForNonEssential) {
-        Map<Long, List<GraphEdge>> byNode = new HashMap<>();
-        for (GraphEdge e : c.edges()) {
-            byNode.computeIfAbsent(e.source(), k -> new ArrayList<>()).add(e);
-            byNode.computeIfAbsent(e.target(), k -> new ArrayList<>()).add(e);
-        }
-        LinkedHashSet<GraphEdge> kept = new LinkedHashSet<>();
-        for (List<GraphEdge> nodeEdges : byNode.values()) {
-            List<GraphEdge> graphEdgeStream = nodeEdges.stream()
-                    .sorted(Comparator.comparingDouble(GraphEdge::score).reversed())
-                    .toList();
-            graphEdgeStream
-                    .stream()
-                    .limit(minPerNode)
-                    .forEach(kept::add);
-            graphEdgeStream
-                    .stream()
-                    .skip(minPerNode)
-                    .filter(node -> node.score() > minScoreForNonEssential)
-                    .forEach(kept::add);
-        }
-        if (kept.size() == c.edges().size()) return c;
-        List<GraphEdge> edges = List.copyOf(kept);
-        return new Component(nodeIdsOf(edges), edges);
-    }
-
     public static Map<Long, Double> edgeSums(List<GraphEdge> edges) {
         Map<Long, Double> sums = new HashMap<>();
         for (GraphEdge e : edges) {

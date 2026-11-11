@@ -6,12 +6,17 @@ import com.github.courtandrey.cinegraph.api.config.GraphScoringProperties;
 import com.github.courtandrey.cinegraph.api.config.LetterboxdProperties;
 import com.github.courtandrey.cinegraph.api.dto.*;
 import com.github.courtandrey.cinegraph.api.letterboxd.LetterboxdCsv.FilmRow;
+import com.github.courtandrey.cinegraph.api.letterboxd.cluster.ClusterMaps;
+import com.github.courtandrey.cinegraph.api.letterboxd.cluster.ClusterProfiles;
 import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository;
 import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository.NeighborEdge;
+import com.github.courtandrey.cinegraph.api.repo.EdgeQueryRepository.PairEdge;
 import com.github.courtandrey.cinegraph.api.repo.LetterboxdSetRepository;
 import com.github.courtandrey.cinegraph.api.repo.LetterboxdSetRepository.MovieRating;
 import com.github.courtandrey.cinegraph.api.repo.LetterboxdSetRepository.SetFilm;
+import com.github.courtandrey.cinegraph.api.repo.LetterboxdSetRepository.SetPlacement;
 import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository;
+import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository.MovieGenre;
 import com.github.courtandrey.cinegraph.api.repo.MovieQueryRepository.TitleYearMatch;
 import com.github.courtandrey.cinegraph.api.service.EngineRecommender;
 import com.github.courtandrey.cinegraph.api.service.GraphScoring;
@@ -44,6 +49,7 @@ public class LetterboxdGraphService {
     private static final int DEFAULT_LIMIT = 40;
     private static final int SHORTS_OVERFETCH = 4;
     private static final int MAX_ENGINE_FETCH = 6_400;
+    private static final int TOP_CONTRIBUTORS = 10;
 
     private final LetterboxdTmdbResolver tmdbResolver;
     private final MovieQueryRepository movieRepo;
@@ -85,14 +91,14 @@ public class LetterboxdGraphService {
                 ? setRepo.loadMovieIds(hash)
                 : resolveAndStore(hash, csv);
         Assembled a = assemble(movieIds);
-        bakeGraphIds(hash, a);
-        return new LetterboxdUploadResponse(hash, a.graphs());
+        bakePlacements(hash, a);
+        return new LetterboxdUploadResponse(hash, a.map());
     }
 
-    public List<LetterboxdGraph> overview(String hash) {
+    public LetterboxdMap overview(String hash) {
         Assembled a = assemble(setRepo.loadMovieIds(hash));
-        bakeGraphIds(hash, a);
-        return a.graphs();
+        bakePlacements(hash, a);
+        return a.map();
     }
 
     public List<LetterboxdSearchResult> search(String hash, String q, int limit) {
@@ -109,15 +115,15 @@ public class LetterboxdGraphService {
                 .toList();
     }
 
-    public List<GraphNode> recommendations(String hash, Long graphId, boolean invert,
+    public List<GraphNode> recommendations(String hash, Long graphId, Long clusterId, boolean invert,
                                            int minRuntime, int limitReq) {
         int limit = Math.clamp(limitReq, 1, MAX_LIMIT);
         List<SetFilm> films = setRepo.loadSetFilms(hash);
         if (films.isEmpty()) return List.of();
 
         List<EdgeQueryRepository.Recommendation> recs =
-                engineRecommendations(films, graphId, invert, minRuntime, limit)
-                        .orElseGet(() -> edgeRepo.topRecommendations(hash, graphId, invert, minRuntime, limit));
+                engineRecommendations(films, graphId, clusterId, invert, minRuntime, limit)
+                        .orElseGet(() -> edgeRepo.topRecommendations(hash, graphId, clusterId, invert, minRuntime, limit));
 
         Map<Long, GraphNode> nodeById = movieRepo
                 .findNodesByIds(recs.stream().map(EdgeQueryRepository.Recommendation::movieId).toList())
@@ -131,9 +137,10 @@ public class LetterboxdGraphService {
     }
 
     private Optional<List<EdgeQueryRepository.Recommendation>> engineRecommendations(
-            List<SetFilm> films, Long graphId, boolean invert, int minRuntime, int limit) {
+            List<SetFilm> films, Long graphId, Long clusterId, boolean invert, int minRuntime, int limit) {
         List<EngineRecommender.Seed> seeds = films.stream()
                 .filter(f -> graphId == null || Objects.equals(f.graphId(), graphId))
+                .filter(f -> clusterId == null || Objects.equals(f.clusterId(), clusterId))
                 .map(f -> new EngineRecommender.Seed(f.movieId(),
                         ratingCoef(f.rating() == null ? null : f.rating().doubleValue())))
                 .toList();
@@ -214,8 +221,8 @@ public class LetterboxdGraphService {
         });
     }
 
-    private void bakeGraphIds(String hash, Assembled a) {
-        setRepo.updateGraphIds(hash, a.graphIdByMovie());
+    private void bakePlacements(String hash, Assembled a) {
+        setRepo.updatePlacements(hash, a.placementByMovie());
     }
 
     public Optional<GraphPayload> recenter(String hash, long movieId, float minScore, int limit) {
@@ -325,50 +332,76 @@ public class LetterboxdGraphService {
     }
 
     private Assembled assemble(List<Long> movieIds) {
-        List<GraphEdge> edges = edgeRepo.findEdgesAmong(movieIds).stream()
-                .map(this::toGraphEdge)
+        List<PairEdge> pairs = edgeRepo.findEdgesAmong(movieIds);
+        List<GraphEdge> allEdges = pairs.stream().map(this::toGraphEdge).toList();
+        Graphs.Component capped = Graphs.capNodes(
+                new Graphs.Component(List.copyOf(Graphs.edgeSums(allEdges).keySet()), allEdges),
+                props.getMaxGraphNodes());
+        List<GraphEdge> edges = Graphs.components(capped.edges()).stream()
+                .filter(c -> c.nodeIds().size() >= props.getMinGraphNodes())
+                .flatMap(c -> c.edges().stream())
                 .toList();
+        Map<Long, Double> inScore = Graphs.edgeSums(edges);
+        Set<Long> kept = inScore.keySet();
 
-        List<Built> built = new ArrayList<>();
-        Map<Long, Long> graphIdByMovie = new HashMap<>();
-        for (Graphs.Component comp : Graphs.components(edges)) {
-            Map<Long, Double> inScore = Graphs.edgeSums(comp.edges());
-            Graphs.Component withNodes = Graphs.capNodes(comp, props.getMaxGraphNodes());
-            Graphs.Component view = Graphs.capEdgesPerNode(
-                    withNodes, props.getMinEdgesPerNode(), props.getMinScoreForNonEssential());
-            if (view.nodeIds().size() >= props.getMinGraphNodes()) {
-                long centerId = inScore.entrySet().stream()
-                        .max(Map.Entry.comparingByValue())
-                        .map(Map.Entry::getKey)
-                        .orElse(0L);
-                built.add(new Built(view, inScore, centerId));
-                comp.nodeIds().forEach(m -> graphIdByMovie.put(m, centerId));
-            }
-        }
-        movieIds.forEach(m -> graphIdByMovie.putIfAbsent(m, 0L));
+        ClusterMaps.ClusterMap map = ClusterMaps.build(
+                pairs.stream()
+                        .filter(p -> kept.contains(p.movieA()) && kept.contains(p.movieB()))
+                        .map(p -> new ClusterMaps.Pair(p.movieA(), p.movieB(), p.crewScore()))
+                        .toList(),
+                inScore,
+                new ClusterMaps.Settings(props.getClusterResolution(), props.getMinClusterSize(),
+                        props.getFloaterShare()));
 
-        List<Long> ids = built.stream().flatMap(b -> b.view().nodeIds().stream()).distinct().toList();
-        Map<Long, GraphNode> nodeById = movieRepo.findNodesByIds(ids).stream()
-                .collect(Collectors.toMap(GraphNode::id, Function.identity()));
-
-        List<LetterboxdGraph> graphs = built.stream()
-                .map(b -> toGraph(b, nodeById))
-                .sorted(Comparator.comparingInt((LetterboxdGraph g) -> g.nodes().size()).reversed())
+        Map<Long, ClusterMaps.PlacedFilm> filmById = map.films().stream()
+                .collect(Collectors.toMap(ClusterMaps.PlacedFilm::movieId, Function.identity()));
+        List<GraphNode> nodes = movieRepo.findNodesByIds(List.copyOf(filmById.keySet())).stream()
+                .map(n -> n.withInScore(inScore.getOrDefault(n.id(), 0.0)))
+                .sorted(Comparator.comparingLong(GraphNode::id))
                 .toList();
-        return new Assembled(graphs, graphIdByMovie);
+        LetterboxdMap dto = new LetterboxdMap(nodes,
+                edges.stream().map(e -> new MapEdge(e.source(), e.target(), e.score(), e.topReason())).toList(),
+                map.films().stream().map(LetterboxdGraphService::toMapFilm).toList(),
+                clusterProfiles(map, edges, kept),
+                map.links().stream()
+                        .map(l -> new ClusterLink(l.source(), l.target(), l.weight(), l.affinity(), l.edges()))
+                        .toList());
+
+        Map<Long, SetPlacement> placements = new HashMap<>();
+        movieIds.forEach(m -> placements.put(m, Optional.ofNullable(filmById.get(m))
+                .map(f -> new SetPlacement(f.componentId(), f.clusterId()))
+                .orElse(new SetPlacement(0L, 0L))));
+        return new Assembled(dto, placements);
     }
 
-    private record Assembled(List<LetterboxdGraph> graphs, Map<Long, Long> graphIdByMovie) {}
-
-    private record Built(Graphs.Component view, Map<Long, Double> inScore, long centerId) {}
-
-    private LetterboxdGraph toGraph(Built b, Map<Long, GraphNode> nodeById) {
-        List<GraphNode> nodes = b.view().nodeIds().stream()
-                .map(nodeById::get)
-                .filter(Objects::nonNull)
-                .map(n -> n.withInScore(b.inScore().getOrDefault(n.id(), 0.0)))
+    private List<MapCluster> clusterProfiles(ClusterMaps.ClusterMap map, List<GraphEdge> edges, Set<Long> kept) {
+        Map<Long, Long> clusterOf = map.films().stream()
+                .collect(Collectors.toMap(ClusterMaps.PlacedFilm::movieId, ClusterMaps.PlacedFilm::clusterId));
+        Map<Long, List<GraphEdge>> internal = edges.stream()
+                .filter(e -> Objects.equals(clusterOf.get(e.source()), clusterOf.get(e.target())))
+                .collect(Collectors.groupingBy(e -> clusterOf.get(e.source())));
+        Map<Long, List<MovieGenre>> genres = movieRepo.findGenres(kept).stream()
+                .collect(Collectors.groupingBy(MovieGenre::movieId));
+        return map.discs().stream()
+                .map(d -> new MapCluster(d.id(), d.kind(), d.componentId(), d.id(), d.members().size(),
+                        d.center().x(), d.center().y(), d.radius(),
+                        ClusterProfiles.genres(d.members(), genres),
+                        ClusterProfiles.contributors(internal.getOrDefault(d.id(), List.of()), TOP_CONTRIBUTORS)))
                 .toList();
-        return new LetterboxdGraph(b.centerId(), nodes, b.view().edges());
+    }
+
+    private static MapFilm toMapFilm(ClusterMaps.PlacedFilm f) {
+        return new MapFilm(f.movieId(), f.clusterId(), f.componentId(), f.placement(),
+                f.cohesion(), f.linksInside(), f.linksTotal(),
+                f.shares().stream().map(s -> new MapFilm.ClusterShare(s.clusterId(), s.share(), s.links())).toList(),
+                f.position().x(), f.position().y());
+    }
+
+    private record Assembled(LetterboxdMap map, Map<Long, SetPlacement> placementByMovie) {}
+
+    private GraphEdge toGraphEdge(PairEdge e) {
+        JsonNode components = parseComponents(e.componentsJson());
+        return new GraphEdge(e.movieA(), e.movieB(), e.totalScore(), topReason.resolve(components), components);
     }
 
     private GraphEdge toGraphEdge(NeighborEdge e) {

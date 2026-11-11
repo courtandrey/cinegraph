@@ -166,6 +166,18 @@ public class MovieQueryRepository {
                 .fetch(r -> new GraphNode(r.value1(), r.value2(), toInteger(r.value3()), r.value4(), 0.0));
     }
 
+    public record MovieGenre(long movieId, int genreId, String name) {}
+
+    public List<MovieGenre> findGenres(Collection<Long> ids) {
+        if (ids.isEmpty()) return List.of();
+        return ctx.select(MOVIE_GENRE.MOVIE_ID, GENRE.GENRE_ID, GENRE.NAME)
+                .from(MOVIE_GENRE)
+                .join(GENRE).on(GENRE.GENRE_ID.eq(MOVIE_GENRE.GENRE_ID))
+                .where(MOVIE_GENRE.MOVIE_ID.in(ids))
+                .orderBy(MOVIE_GENRE.MOVIE_ID, GENRE.GENRE_ID)
+                .fetch(r -> new MovieGenre(r.value1(), r.value2(), r.value3()));
+    }
+
     public static Condition runsShorterThan(int minutes) {
         return MOVIE.RUNTIME.gt((short) 0).and(MOVIE.RUNTIME.lt((short) minutes));
     }

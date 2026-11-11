@@ -1,0 +1,55 @@
+<div class="cluster-head">
+  <span class="swatch swatch-lg"></span>
+  <div>
+    <h2 class="detail-title">{{ label }}</h2>
+    @if (hub; as hub) {
+      <div class="detail-year">around <button class="link-btn" (click)="filmTap.emit(hub.id)">{{ hub.title }}</button></div>
+    }
+  </div>
+</div>
+<div class="cluster-stats">
+  <span><strong>{{ cluster.size }}</strong> films</span>
+  @if (bridges > 0) {
+    <span><strong>{{ bridges }}</strong> between clusters</span>
+  }
+</div>
+
+@if (segments().length) {
+  <div class="section-header">GENRES</div>
+  <div class="genre-bar" role="img" [attr.aria-label]="'Genre mix of this ' + (cluster.kind === 'CLUSTER' ? 'cluster' : 'group')">
+    @for (g of segments(); track g.genreId) {
+      <span [style.flex-grow]="g.share" [style.background]="g.color" [title]="g.name + ' ' + percent(g.share)"></span>
+    }
+  </div>
+  <div class="genre-legend">
+    @for (g of segments().slice(0, 5); track g.genreId) {
+      <span class="genre-key"><span class="dot" [style.background]="g.color"></span>{{ g.name }} {{ percent(g.share) }}</span>
+    }
+  </div>
+}
+
+@if (cluster.contributors.length) {
+  <div class="section-header">TOP CONTRIBUTORS</div>
+  <ol class="contributors">
+    @for (p of cluster.contributors; track p.personId; let i = $index) {
+      <li class="contributor">
+        <span class="rec-rank">{{ i + 1 }}</span>
+        <span class="contributor-name">{{ p.name }}<span class="contributor-role">{{ roleName(p.role) }} · {{ p.films }} films</span></span>
+        <span class="rec-score">{{ p.score.toFixed(0) }}</span>
+      </li>
+    }
+  </ol>
+}
+
+@if (neighbours.length) {
+  <div class="section-header">CLOSEST CLUSTERS</div>
+  <div class="neighbours">
+    @for (n of neighbours; track n.id) {
+      <button class="cluster-row" (click)="clusterTap.emit(n.id)">
+        <span class="swatch" [style.background]="n.color"></span>
+        <span class="cluster-row-name">{{ n.label }}</span>
+        <span class="cluster-row-meta">›</span>
+      </button>
+    }
+  </div>
+}

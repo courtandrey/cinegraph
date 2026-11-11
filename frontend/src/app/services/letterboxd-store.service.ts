@@ -1,19 +1,43 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { LetterboxdGraph, GraphNode, GraphEdge } from '../models/movie.model';
+import { LetterboxdMap, GraphNode, MapEdge, MapFilm, MapCluster } from '../models/movie.model';
+import { placeAdded } from '../pages/letterboxd/cluster-map/cluster-geometry';
 
 @Injectable({ providedIn: 'root' })
 export class LetterboxdStore {
-  private _graphs = signal<LetterboxdGraph[]>([]);
-  private _index = signal(0);
+  private _map = signal<LetterboxdMap | null>(null);
   private _hash = signal<string | null>(null);
   private _inScoreThreshold = signal(0);
 
-  readonly graphs = this._graphs.asReadonly();
-  readonly index = this._index.asReadonly();
+  readonly map = this._map.asReadonly();
   readonly hash = this._hash.asReadonly();
   readonly inScoreThreshold = this._inScoreThreshold.asReadonly();
-  readonly count = computed(() => this._graphs().length);
-  readonly current = computed(() => this._graphs()[this._index()] ?? null);
+  readonly loaded = computed(() => (this._map()?.nodes.length ?? 0) > 0);
+
+  readonly filmById = computed(() => {
+    const out = new Map<number, MapFilm>();
+    for (const f of this._map()?.films ?? []) out.set(f.movieId, f);
+    return out;
+  });
+
+  readonly adjacency = computed(() => {
+    const out = new Map<number, MapEdge[]>();
+    const push = (id: number, e: MapEdge) => {
+      const list = out.get(id);
+      if (list) list.push(e);
+      else out.set(id, [e]);
+    };
+    for (const e of this._map()?.edges ?? []) {
+      push(e.source, e);
+      push(e.target, e);
+    }
+    return out;
+  });
+
+  readonly clusterById = computed(() => {
+    const out = new Map<number, MapCluster>();
+    for (const c of this._map()?.clusters ?? []) out.set(c.id, c);
+    return out;
+  });
 
   private recsScrollKey: string | null = null;
   private recsScrollTop = 0;
@@ -27,10 +51,9 @@ export class LetterboxdStore {
     return this.recsScrollKey === key ? this.recsScrollTop : 0;
   }
 
-  set(hash: string, graphs: LetterboxdGraph[]): void {
+  set(hash: string, map: LetterboxdMap): void {
     this._hash.set(hash);
-    this._graphs.set(graphs);
-    this._index.set(0);
+    this._map.set(map);
     this._inScoreThreshold.set(0);
     this.recsScrollKey = null;
     this.recsScrollTop = 0;
@@ -40,54 +63,21 @@ export class LetterboxdStore {
     this._inScoreThreshold.set(v);
   }
 
-  setIndex(i: number): void {
-    if (i >= 0 && i < this._graphs().length) this._index.set(i);
-  }
-
-  graphIndexOf(movieId: number): number {
-    return this._graphs().findIndex(g => g.nodes.some(n => n.id === movieId));
-  }
-
-  graphIndexByCenter(centerId: number): number {
-    return this._graphs().findIndex(g => g.centerId === centerId);
-  }
-
-  mergeIntoCurrent(node: GraphNode, edges: GraphEdge[]): void {
-    this._graphs.update(graphs => {
-      const i = this._index();
-      const g = graphs[i];
-      if (!g) return graphs;
-      const nodes = g.nodes.some(n => n.id === node.id) ? g.nodes : [...g.nodes, node];
-      const seen = new Set(g.edges.map(e => `${e.source}-${e.target}`));
-      const added = edges.filter(e =>
-        !seen.has(`${e.source}-${e.target}`) && !seen.has(`${e.target}-${e.source}`));
-      const next = [...graphs];
-      next[i] = { ...g, nodes, edges: [...g.edges, ...added] };
-      return next;
-    });
-  }
-
-  mergeManyIntoCurrent(nodes: GraphNode[], edges: GraphEdge[]): void {
-    this._graphs.update(graphs => {
-      const i = this._index();
-      const g = graphs[i];
-      if (!g) return graphs;
-      const have = new Set(g.nodes.map(n => n.id));
+  merge(nodes: GraphNode[], edges: MapEdge[]): void {
+    this._map.update(map => {
+      if (!map) return map;
+      const have = new Set(map.nodes.map(n => n.id));
       const addNodes = nodes.filter(n => !have.has(n.id));
-      const seen = new Set(g.edges.map(e => `${e.source}-${e.target}`));
-      const addEdges = edges.filter(e =>
-        !seen.has(`${e.source}-${e.target}`) && !seen.has(`${e.target}-${e.source}`));
-      const next = [...graphs];
-      next[i] = { ...g, nodes: [...g.nodes, ...addNodes], edges: [...g.edges, ...addEdges] };
-      return next;
+      const seen = new Set(map.edges.map(e => edgeKey(e.source, e.target)));
+      const addEdges = edges.filter(e => !seen.has(edgeKey(e.source, e.target)));
+      const allEdges = [...map.edges, ...addEdges];
+      const films = [...map.films];
+      for (const n of addNodes) films.push(placeAdded(n.id, films, allEdges));
+      return { ...map, nodes: [...map.nodes, ...addNodes], edges: allEdges, films };
     });
   }
+}
 
-  next(): void {
-    this._index.update(i => Math.min(i + 1, this._graphs().length - 1));
-  }
-
-  prev(): void {
-    this._index.update(i => Math.max(i - 1, 0));
-  }
+function edgeKey(a: number, b: number): string {
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
 }

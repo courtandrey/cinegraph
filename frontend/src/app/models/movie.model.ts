@@ -47,15 +47,82 @@ export interface GraphPayload {
   edges: GraphEdge[];
 }
 
-export interface LetterboxdGraph {
-  centerId: number;
+export type ClusterKind = 'CLUSTER' | 'GROUP';
+
+export type FilmPlacement = 'CORE' | 'BRIDGE' | 'ADDED';
+
+export interface ClusterShare {
+  clusterId: number;
+  share: number;
+  links: number;
+}
+
+export interface MapEdge {
+  source: number;
+  target: number;
+  score: number;
+  topReason: string;
+}
+
+export interface MapFilm {
+  movieId: number;
+  clusterId: number;
+  componentId: number;
+  placement: FilmPlacement;
+  cohesion: number;
+  linksInside: number;
+  linksTotal: number;
+  shares: ClusterShare[];
+  x: number;
+  y: number;
+}
+
+export interface GenreShare {
+  genreId: number;
+  name: string;
+  films: number;
+}
+
+export interface Contributor {
+  personId: number;
+  name: string;
+  role: string;
+  films: number;
+  score: number;
+}
+
+export interface MapCluster {
+  id: number;
+  kind: ClusterKind;
+  componentId: number;
+  hubId: number;
+  size: number;
+  x: number;
+  y: number;
+  radius: number;
+  genres: GenreShare[];
+  contributors: Contributor[];
+}
+
+export interface ClusterLink {
+  source: number;
+  target: number;
+  weight: number;
+  affinity: number;
+  edges: number;
+}
+
+export interface LetterboxdMap {
   nodes: GraphNode[];
-  edges: GraphEdge[];
+  edges: MapEdge[];
+  films: MapFilm[];
+  clusters: MapCluster[];
+  links: ClusterLink[];
 }
 
 export interface LetterboxdUploadResponse {
   hash: string;
-  graphs: LetterboxdGraph[];
+  map: LetterboxdMap;
 }
 
 export interface LetterboxdSearchResult {
