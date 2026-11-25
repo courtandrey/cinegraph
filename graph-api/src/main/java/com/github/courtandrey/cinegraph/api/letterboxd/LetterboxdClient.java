@@ -18,6 +18,8 @@ import java.util.Optional;
 @Slf4j
 public class LetterboxdClient {
 
+    private static final int MAX_REDIRECTS = 5;
+
     private final HttpClient http;
     private final LetterboxdProperties props;
 
@@ -25,15 +27,32 @@ public class LetterboxdClient {
         this.props = props;
         this.http = HttpClient.newBuilder()
                 .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
-                .followRedirects(HttpClient.Redirect.NORMAL)
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
     }
 
     public Try<Optional<String>> filmPage(String uri) {
+        return LetterboxdUris.filmUri(uri)
+                .map(target -> fetch(target, MAX_REDIRECTS))
+                .orElseGet(() -> Try.failure(new ForeignUriException()));
+    }
+
+    private Try<Optional<String>> fetch(URI uri, int redirectsLeft) {
         return Try.of(() -> http.send(request(uri), HttpResponse.BodyHandlers.ofString()))
                 .andThen(resp -> log.debug("Response from letterboxd {}", resp.statusCode()))
-                .flatMap(LetterboxdClient::body);
+                .flatMap(resp -> LetterboxdUris.isRedirect(resp.statusCode())
+                        ? follow(uri, resp, redirectsLeft)
+                        : body(resp));
+    }
+
+    private Try<Optional<String>> follow(URI from, HttpResponse<String> redirect, int redirectsLeft) {
+        return redirectsLeft == 0
+                ? Try.failure(new UnreadablePageException(redirect.statusCode()))
+                : redirect.headers().firstValue("Location")
+                        .flatMap(location -> LetterboxdUris.redirectTarget(from, location))
+                        .map(next -> fetch(next, redirectsLeft - 1))
+                        .orElseGet(() -> Try.failure(new ForeignUriException()));
     }
 
     private static Try<Optional<String>> body(HttpResponse<String> response) {
@@ -50,8 +69,14 @@ public class LetterboxdClient {
         }
     }
 
-    private HttpRequest request(String url) {
-        return HttpRequest.newBuilder(URI.create(url))
+    public static class ForeignUriException extends RuntimeException {
+        public ForeignUriException() {
+            super("Not a Letterboxd URI");
+        }
+    }
+
+    private HttpRequest request(URI url) {
+        return HttpRequest.newBuilder(url)
                 .header("User-Agent", props.getUserAgent())
                 .header("Accept", "text/html,application/xhtml+xml")
                 .timeout(Duration.ofSeconds(20))

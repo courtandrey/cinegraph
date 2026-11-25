@@ -327,7 +327,7 @@ public class LetterboxdGraphService {
 
     private Optional<Long> resolveViaUri(FilmRow row) {
         return Optional.ofNullable(row.uri())
-                .filter(Predicate.not(String::isBlank))
+                .filter(uri -> LetterboxdUris.filmUri(uri).isPresent())
                 .flatMap(uri -> tmdbResolver.resolve(uri).movieId());
     }
 

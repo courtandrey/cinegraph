@@ -139,7 +139,7 @@ function buildCsv(pool, setIndex) {
   const lines = ['Name,Year,Letterboxd URI,Rating'];
   films.forEach((f, i) => {
     const rating = (Math.floor(rng() * 10) + 1) / 2;
-    lines.push(`${csvEscape(f.title)},${f.year},https://boxd.it/perf/${RUN_ID}/${setIndex}/${i},${rating}`);
+    lines.push(`${csvEscape(f.title)},${f.year},https://perf.invalid/${RUN_ID}/${setIndex}/${i},${rating}`);
   });
   return lines.join('\n') + '\n';
 }

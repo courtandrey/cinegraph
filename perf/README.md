@@ -23,7 +23,7 @@ Outputs land in `perf/results/` (git-ignored):
 
 ## What it does
 
-1. **Seeding (setup):** runs ~30 searches against the live API and collects films whose `(title, year)` pair is unique within the results — no hardcoded IDs, works on any loaded environment. Then builds `LB_PARALLEL` CSVs in Letterboxd export format (`Name,Year,Letterboxd URI,Rating`) from the seeded pool — real titles and years, random ratings, a run-scoped nonce in the URI column so every upload gets a fresh hash. Each CSV's hash is precomputed (sha256 of the bytes, same as the server) so later scenarios can address the sets.
+1. **Seeding (setup):** runs ~30 searches against the live API and collects films whose `(title, year)` pair is unique within the results — no hardcoded IDs, works on any loaded environment. Then builds `LB_PARALLEL` CSVs in Letterboxd export format (`Name,Year,Letterboxd URI,Rating`) from the seeded pool — real titles and years, random ratings, a run-scoped nonce in the URI column (`https://perf.invalid/...`, a reserved domain the server never fetches, so a run sends no traffic to Letterboxd) so every upload gets a fresh hash. Each CSV's hash is precomputed (sha256 of the bytes, same as the server) so later scenarios can address the sets.
 2. **Endpoint bursts** (each = `PARALLEL` simultaneous one-shot requests, staggered so endpoints are measured in isolation):
    - `search` — `GET /movies/search`
    - `film_detail` — `GET /movies/{id}`
@@ -49,8 +49,8 @@ Every response is checked for 2xx status and a sane body; any 4xx/5xx fails the 
 |---|---|---|
 | `CINEGRAPH_HOST` | — (required) | Target origin |
 | `PARALLEL` | `100` | Parallel calls per non-letterboxd endpoint |
-| `LB_PARALLEL` | `10` | Parallel uploads / recommendation calls |
-| `SET_SIZE` | `500` | Films per synthetic Letterboxd CSV |
+| `LB_PARALLEL` | `50` | Parallel uploads / recommendation calls |
+| `SET_SIZE` | `1000` | Films per synthetic Letterboxd CSV |
 | `SLO_MS` | `5000` | Non-upload SLO in ms |
 | `SLO_UPLOAD_MS` | `60000` | Upload SLO in ms |
 | `RUN_ID` | timestamp | Nonce embedded in synthetic CSVs and output file names |
@@ -105,3 +105,26 @@ DELETE FROM letterboxd_set WHERE hash IN ('<hash1>', '<hash2>', ...);
 
 - Scenario start times are staggered 30s apart; if an endpoint blows far past its SLO the next burst may overlap with its tail — by then the run has already failed its threshold, so the overlap only affects the magnitude of the numbers, not the verdict.
 - The graph engine must be up for `shortest_path` and engine-served recommendations; without it, paths 500 and the run fails (as it should for a production check).
+
+## Capacity sequence: `sequence.sh`
+
+Runs `MODE=stress` at increasing rates to find the highest rate that still meets every SLO. Each step is a full
+`run.sh` run (own log, summary and hashes files). The sequence checks `/api/movies/health` before each step, waits
+`COOLDOWN_S` between steps so the DB pool and engine recover, and stops at the first SLO breach.
+
+```bash
+CINEGRAPH_HOST=https://cinegraphd.com ./sequence.sh
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `STEPS` | `50 75 100 125 150 200` | Target RPS per step, in order |
+| `RAMP` / `HOLD` | `1m` / `3m` | Per step |
+| `COOLDOWN_S` | `90` | Pause between steps |
+| `LB_PARALLEL` / `SET_SIZE` | `5` / `500` | Background uploads per step, kept small so the read path is what saturates |
+| `CONTINUE_ON_FAIL` | `0` | `1` keeps stepping after a breach (to see "slower" vs "DoS" past the limit) |
+| `SEQ_ID` | `seq-<timestamp>` | Prefix of each step's `RUN_ID` (`<SEQ_ID>-rps<N>`) |
+
+At the end `summarize.py` writes `results/sequence-<SEQ_ID>.md`: one row per step with SLO verdict, average req/s,
+dropped iterations, failure rate and p95 / max per endpoint, followed by the highest passing step and the breached
+thresholds. With the defaults a full sequence takes about 35 minutes.
